@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component-configuration xmlns="http://tis.co.jp/nablarch/component-configuration">
+
+    <!-- db接続情報設定ファイル -->
+   <import file="db-default.xml"/>
+
+   <component name="stringResourceHolder" class="nablarch.test.support.message.MockStringResourceHolder" />
+
+</component-configuration>

@@ -24,8 +24,19 @@ targetCompatibility=JavaVersion.VERSION_1_6
 dependencies {
   compile "com.nablarch.framework:nablarch-fw-standalone:${nablarchFwStandaloneVersion}"
   compile "com.nablarch.framework:nablarch-core-jdbc:${nablarchCoreJdbcVersion}"
+
+  testCompile 'com.oracle:ucp:11.2.0.3.0'
+  testCompile 'com.oracle:ojdbc6:11.2.0.2.0'
+  
+  testCompile 'org.jmockit:jmockit:1.29'
+  testCompile 'junit:junit:4.12'
+  testCompile 'org.hamcrest:hamcrest-all:1.3'
+  testCompile 'com.nablarch.dev:nablarch-test-support:0.0.5'
+  
+  testCompile "com.nablarch.framework:nablarch-common-jdbc:${nablarchCommonJdbcVersion}"
+  testCompile "com.nablarch.framework:nablarch-core-dataformat:${nablarchCoreDataformatVersion}"
 }
 
 task wrapper(type: Wrapper) {
-  gradleVersion = '2.11'
+  gradleVersion = '2.13'
 }

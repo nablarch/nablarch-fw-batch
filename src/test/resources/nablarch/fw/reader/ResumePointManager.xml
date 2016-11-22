@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component-configuration xmlns="http://tis.co.jp/nablarch/component-configuration"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://tis.co.jp/nablarch/component-configuration ../../../../../main/resources/component-configuration.xsd">
+  
+  <import file="nablarch/fw/reader/FileDataReaderTest.xml" />
+
+  <!-- db接続情報設定ファイル -->
+  <import file="db-default.xml" />
+
+  <!-- FileRecordReaderConfigの設定（レジューム機能を使用する） -->
+  <component name="resumePointManager"
+      class="nablarch.fw.reader.ResumePointManager">
+    <property name="tableName" value="RESUME_BATCH_REQUEST" />
+    <property name="requestIdColumnName" value="REQUEST_ID" />
+    <property name="resumePointColumnName" value="RESUME_POINT" />
+    <property name="resumable" value="true" />
+    <property name="excludingRequestList">
+      <list>
+        <value>EX_R0001</value>
+      </list>
+    </property>
+    <property name="dbTransactionName" value="resumeTransaction" />
+  </component>
+
+  <!--  SimpleDbTransactionManager  -->
+  <component name="tran" class="nablarch.core.db.transaction.SimpleDbTransactionManager">
+    <property name="dbTransactionName" value="resumeTransaction" />
+  </component>
+
+
+  <!-- 初期化機能の設定 -->
+  <component name="initializer" class="nablarch.core.repository.initialization.BasicApplicationInitializer">
+    <property name="initializeList">
+      <list>
+        <component-ref name="resumePointManager" />
+      </list>
+    </property>
+  </component>
+
+</component-configuration>

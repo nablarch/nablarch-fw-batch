@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component-configuration
+    xmlns="http://tis.co.jp/nablarch/component-configuration"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://tis.co.jp/nablarch/component-configuration ../../../../../../main/resources/component-configuration.xsd">
+
+  <!-- データベース接続設定 -->
+  <import file="db-default.xml" />
+  
+  <!-- リクエストID抽出の実装 -->
+  <component name="requestIdExtractor" class="nablarch.common.util.ShortRequestIdExtractor" />
+
+  <!-- プロセス停止制御ハンドラ -->
+  <component name="processStopHandler"
+      class="nablarch.fw.handler.BasicProcessStopHandler">
+    <property name="tableName" value="BATCH_REQUEST" />
+    <property name="requestIdColumnName" value="REQUEST_ID" />
+    <property name="processHaltColumnName" value="PROCESS_HALT_FLG" />
+    <property name="dbTransactionManager" ref="tran" />
+  </component>
+
+  <!-- ２重起動防止ハンドラ -->
+  <component name="duplicateProcessCheckHandler"
+      class="nablarch.fw.handler.DuplicateProcessCheckHandler">
+    <property name="duplicateProcessChecker">
+      <component name="BasicDuplicateProcessChecker" class="nablarch.fw.handler.BasicDuplicateProcessChecker">
+        <property name="dbTransactionManager" ref="tran" />
+        <property name="tableName" value="BATCH_REQUEST" />
+        <property name="processIdentifierColumnName" value="REQUEST_ID" />
+        <property name="processActiveFlgColumnName" value="ACTIVE_FLG" />
+      </component>
+    </property>
+  </component>
+
+  <!-- スレッドコンテキスト -->
+  <component name="threadContextHandler"
+      class="nablarch.common.handler.threadcontext.ThreadContextHandler">
+    <property name="attributes">
+      <list>
+        <!-- ユーザID -->
+        <component
+            class="nablarch.common.handler.threadcontext.UserIdAttribute">
+          <property name="sessionKey" value="user.id" />
+          <property name="anonymousId" value="9999999999" />
+        </component>
+        <!-- リクエストID -->
+        <component
+            class="nablarch.common.handler.threadcontext.RequestIdAttribute" />
+        <!-- 内部リクエストID -->
+        <component
+            class="nablarch.common.handler.threadcontext.InternalRequestIdAttribute" />
+        <!-- 実行時ID -->
+        <component
+            class="nablarch.common.handler.threadcontext.ExecutionIdAttribute" />
+      </list>
+    </property>
+  </component>
+
+  <!-- ハンドラーキュー構成 -->
+  <list name="handlerQueue">
+
+    <!-- ステータスコード変換ハンドラ -->
+    <component class="nablarch.fw.handler.StatusCodeConvertHandler" />
+
+    <!-- グローバルエラーハンドラ (メインスレッド用) -->
+    <component class="nablarch.fw.handler.GlobalErrorHandler" />
+
+    <!-- スレッドコンテキスト管理ハンドラ -->
+    <component-ref name="threadContextHandler" />
+    <!-- データベース接続管理ハンドラ (メインスレッド用) -->
+    <component class="nablarch.common.handler.DbConnectionManagementHandler" />
+    <!-- 2重起動制御ハンドラ -->
+    <component-ref name="duplicateProcessCheckHandler" />
+    <!-- リクエストパスベースディスパッチハンドラ -->
+    <component class="nablarch.fw.handler.RequestPathJavaPackageMapping">
+      <property name="basePackage"
+          value="nablarch.fw.action" />
+      <property name="immediate" value="false" />
+    </component>
+    <!-- マルチスレッド実行制御ハンドラ -->
+    <component class="nablarch.fw.handler.MultiThreadExecutionHandler">
+      <property name="concurrentNumber" value="1" />
+      <property name="terminationTimeout" value="600" />
+    </component>
+
+    <!-- データベース接続管理ハンドラ (リクエストスレッド用)  -->
+    <component class="nablarch.common.handler.DbConnectionManagementHandler" />
+
+    <!-- ループハンドラ -->
+    <component class="nablarch.fw.handler.LoopHandler" />
+
+    <!-- データリードハンドラ -->
+    <component class="nablarch.fw.handler.DataReadHandler" />
+  </list>
+
+  <component name="initializer"
+      class="nablarch.core.repository.initialization.BasicApplicationInitializer">
+    <!--
+      BasicApplicationInitializerのinitializeListプロパティ。
+      ここで記述した順序で初期化が実行される。
+    -->
+    <property name="initializeList">
+      <list>
+        <component-ref name="processStopHandler" />
+        <component-ref name="duplicateProcessCheckHandler.BasicDuplicateProcessChecker" />
+      </list>
+    </property>
+  </component>
+
+</component-configuration>
+
