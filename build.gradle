@@ -10,12 +10,14 @@ buildscript {
   }
   dependencies {
     classpath "com.nablarch.dev:nablarch-gradle-plugin:${nablarchGradlePluginVersion}"
+    classpath "net.saliman:gradle-cobertura-plugin:2.2.3"
   }
 }
 apply plugin: 'com.nablarch.dev.nablarch-build'
 apply plugin: 'com.nablarch.dev.nablarch-maven-deploy'
 apply plugin: 'com.nablarch.dev.nablarch-sonarqube'
 apply plugin: 'com.nablarch.dev.nablarch-version'
+apply from: 'https://github.com/nablarch/nablarch-gradle-plugin/blob/develop/scripts/cobertura/cobertura-0.0.1.gradle?raw=true'
 
 // ビルド時のJavaバージョンを指定する
 sourceCompatibility=JavaVersion.VERSION_1_6
@@ -35,6 +37,10 @@ dependencies {
   
   testCompile "com.nablarch.framework:nablarch-common-jdbc:${nablarchCommonJdbcVersion}"
   testCompile "com.nablarch.framework:nablarch-core-dataformat:${nablarchCoreDataformatVersion}"
+}
+
+tasks.sonarRunner {
+  dependsOn = ['coverage']
 }
 
 task wrapper(type: Wrapper) {
