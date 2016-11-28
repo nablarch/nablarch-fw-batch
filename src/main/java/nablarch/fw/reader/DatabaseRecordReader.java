@@ -29,9 +29,7 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
     /** 条件 */
     private Object condition;
 
-    /**
-     * データベースからのレコード取得前に実行するリスナ
-     */
+    /** データベースレコードリスナ */
     private DatabaseRecordListener listener;
 
     /**
@@ -123,10 +121,6 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
         } else {
             throw new IllegalStateException("Statement was not set.");
         }
-
-        if (listener != null) {
-            listener.afterReadRecords();
-        }
     }
 
     /**
@@ -159,12 +153,11 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
     /**
      * データベースレコードリスナを設定する。
      * <p/>
-     * リスナに定義されたコールバック処理は、それぞれ以下のタイミングで実行される。<br/>
-     * ・処理対象レコードをキャッシュするためのデータベースアクセス前<br/>
-     * ・データベースから取得した処理対象レコードをキャッシュした後
+     * リスナに定義されたコールバック処理は、
+     * 処理対象レコードをキャッシュするためのデータベースアクセス前に実行される。
      * <p/>
      * 本リーダにリスナを設定することで、
-     * 処理対象レコードを取得する前に別トランザクションでレコードを更新するといったことが実現できる。
+     * 処理対象レコードをデータベースから取得する前に任意の処理を実行することができる。
      *
      * @param listener データベースレコードリスナ
      * @return このオブジェクト自体

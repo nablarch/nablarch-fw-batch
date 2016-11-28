@@ -313,9 +313,6 @@ public class DatabaseRecordReaderTest {
                     }
                 }.doTransaction();
             }
-
-            @Override
-            public void afterReadRecords() {}
         });
 
         // カラムが全て更新されていること
@@ -328,61 +325,6 @@ public class DatabaseRecordReaderTest {
         VariousDbTestHelper.insert(new ReaderBook("title4", "publisher4", "authors4"));
         reader.reopen(null);
         assertThat(reader.read(null).getString("publisher"), is("change"));
-        assertThat(reader.read(null).getString("publisher"), is("change"));
-        assertThat(reader.read(null).getString("publisher"), is("change"));
-        assertThat(reader.read(null).getString("publisher"), is("change"));
-        assertThat(reader.read(null), is(nullValue()));
-    }
-
-    /**
-     * データベースのレコードをキャッシュした後で、設定されたリスナが動作すること
-     */
-    @Test
-    public void testAfterListener() {
-        VariousDbTestHelper.setUpTable(
-                new ReaderBook("title1", "publisher1", "authors1"),
-                new ReaderBook("title2", "publisher2", "authors2"),
-                new ReaderBook("title3", "publisher3", "authors3"));
-
-
-        // テスト用のトランザクションマネージャをリポジトリに登録
-        ConnectionFactory connectionFactory = repositoryResource.getComponent("connectionFactory");
-        TransactionFactory transactionFactory = repositoryResource.getComponent("jdbcTransactionFactory");
-        SimpleDbTransactionManager manager = new SimpleDbTransactionManager();
-        manager.setDbTransactionName("testTransaction");
-        manager.setConnectionFactory(connectionFactory);
-        manager.setTransactionFactory(transactionFactory);
-        repositoryResource.addComponent("testTransaction", manager);
-
-        DatabaseRecordReader reader = new DatabaseRecordReader();
-        reader.setStatement(DbConnectionContext.getConnection().prepareStatement("SELECT * FROM READER_BOOK ORDER BY TITLE"));
-
-        // レコードをキャッシュした後で、PUBLISHERカラムの値を全て"change"に変更するSQLを発行するリスナを追加
-        reader.setListener(new DatabaseRecordListener() {
-            @Override
-            public void beforeReadRecords() {}
-
-            @Override
-            public void afterReadRecords() {
-                SimpleDbTransactionManager manager = SystemRepository.get("testTransaction");
-                new SimpleDbTransactionExecutor<Void>(manager) {
-                    @Override
-                    public Void execute(AppDbConnection appDbConnection) {
-                        appDbConnection.prepareStatement("UPDATE READER_BOOK SET PUBLISHER = 'change'").executeUpdate();
-                        return null;
-                    }
-                }.doTransaction();
-            }
-        });
-
-        // キャッシュから取得しているため、カラムが更新されていないこと
-        assertThat(reader.read(null).getString("publisher"), is("publisher1"));
-        assertThat(reader.read(null).getString("publisher"), is("publisher2"));
-        assertThat(reader.read(null).getString("publisher"), is("publisher3"));
-        assertThat(reader.read(null), is(nullValue()));
-
-        // DBから最新を取得したため、カラムが更新されているレコードを取得できること
-        reader.reopen(null);
         assertThat(reader.read(null).getString("publisher"), is("change"));
         assertThat(reader.read(null).getString("publisher"), is("change"));
         assertThat(reader.read(null).getString("publisher"), is("change"));
