@@ -7,7 +7,7 @@ import nablarch.core.util.annotation.Published;
  *
  * @author Naoki Yamamoto
  */
-@Published(tag = "architect")
+@Published
 public interface DatabaseRecordListener {
 
     /**
