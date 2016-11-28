@@ -301,7 +301,7 @@ public class DatabaseRecordReaderTest {
         reader.setStatement(DbConnectionContext.getConnection().prepareStatement("SELECT * FROM READER_BOOK"));
 
         // PUBLISHERカラムの値を全て"change"に変更するSQLを発行するリスナを追加
-        reader.addListeners(new DatabaseRecordListener() {
+        reader.setListener(new DatabaseRecordListener() {
             @Override
             public void beforeReadRecords() {
                 SimpleDbTransactionManager manager = SystemRepository.get("testTransaction");

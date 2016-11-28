@@ -1,9 +1,6 @@
 package nablarch.fw.reader;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
 import nablarch.core.db.statement.ParameterizedSqlPStatement;
@@ -33,9 +30,9 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
     private Object condition;
 
     /**
-     * {@link DatabaseRecordListener}のリスト
+     * データベースからのレコード取得前に実行するリスナ
      */
-    private List<DatabaseRecordListener> listeners = new ArrayList<DatabaseRecordListener>();
+    private DatabaseRecordListener listener;
 
     /**
      * {@code DatabaseRecordReader}オブジェクトを生成する。
@@ -110,7 +107,7 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
      */
     @SuppressWarnings("unchecked")
     private void readRecords() {
-        for (DatabaseRecordListener listener : listeners) {
+        if (listener != null) {
             listener.beforeReadRecords();
         }
 
@@ -156,13 +153,13 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
     }
 
     /**
-     * データベースからのレコード取得前に実行するリスナを追加する。
+     * データベースからのレコード取得前に実行するリスナを設定する。
      * @param listener データベースからのレコード取得前に実行するリスナ
      * @return このオブジェクト自体
      */
     @Published
-    public DatabaseRecordReader addListeners(DatabaseRecordListener... listener) {
-        listeners.addAll(Arrays.asList(listener));
+    public DatabaseRecordReader setListener(DatabaseRecordListener listener) {
+        this.listener = listener;
         return this;
     }
 }
