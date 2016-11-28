@@ -111,7 +111,7 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
     @SuppressWarnings("unchecked")
     private void readRecords() {
         for (DatabaseRecordListener listener : listeners) {
-            listener.beforeReadRecord();
+            listener.beforeReadRecords();
         }
 
         if (statement != null) {

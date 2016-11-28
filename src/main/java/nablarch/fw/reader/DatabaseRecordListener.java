@@ -13,5 +13,5 @@ public interface DatabaseRecordListener {
     /**
      * データベースからレコードを取得する前に呼び出される。
      */
-    void beforeReadRecord();
+    void beforeReadRecords();
 }

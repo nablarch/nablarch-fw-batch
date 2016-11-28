@@ -303,7 +303,7 @@ public class DatabaseRecordReaderTest {
         // PUBLISHERカラムの値を全て"change"に変更するSQLを発行するリスナを追加
         reader.addListeners(new DatabaseRecordListener() {
             @Override
-            public void beforeReadRecord() {
+            public void beforeReadRecords() {
                 SimpleDbTransactionManager manager = SystemRepository.get("testTransaction");
                 new SimpleDbTransactionExecutor<Void>(manager) {
                     @Override
