@@ -123,6 +123,10 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
         } else {
             throw new IllegalStateException("Statement was not set.");
         }
+
+        if (listener != null) {
+            listener.afterReadRecords();
+        }
     }
 
     /**
@@ -153,8 +157,16 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
     }
 
     /**
-     * データベースからのレコード取得前に実行するリスナを設定する。
-     * @param listener データベースからのレコード取得前に実行するリスナ
+     * データベースレコードリスナを設定する。
+     * <p/>
+     * リスナに定義されたコールバック処理は、それぞれ以下のタイミングで実行される。<br/>
+     * ・処理対象レコードをキャッシュするためのデータベースアクセス前<br/>
+     * ・データベースから取得した処理対象レコードをキャッシュした後
+     * <p/>
+     * 本リーダにリスナを設定することで、
+     * 処理対象レコードを取得する前に別トランザクションでレコードを更新するといったことが実現できる。
+     *
+     * @param listener データベースレコードリスナ
      * @return このオブジェクト自体
      */
     @Published

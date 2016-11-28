@@ -3,7 +3,8 @@ package nablarch.fw.reader;
 import nablarch.core.util.annotation.Published;
 
 /**
- * {@link DatabaseRecordReader}のデータベースからのレコード取得前に行う処理を定義するインタフェース。
+ * {@link DatabaseRecordReader}で処理対象レコードをキャッシュするためのデータベースアクセス前後に
+ * コールバックされるメソッドを定義するインタフェース。
  *
  * @author Naoki Yamamoto
  */
@@ -11,7 +12,12 @@ import nablarch.core.util.annotation.Published;
 public interface DatabaseRecordListener {
 
     /**
-     * データベースからレコードを取得する前に呼び出される。
+     * 処理対象レコードをキャッシュするためのデータベースアクセス前に呼び出される。
      */
     void beforeReadRecords();
+
+    /**
+     * データベースから取得した処理対象レコードをキャッシュした後で呼び出される。
+     */
+    void afterReadRecords();
 }
