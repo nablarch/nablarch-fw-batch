@@ -10,7 +10,6 @@ import nablarch.core.util.annotation.Published;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
 
-
 /**
  * データベースの参照結果を1レコードづつ読み込むデータリーダ。
  *
@@ -29,6 +28,9 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
 
     /** 条件 */
     private Object condition;
+
+    /** データベースレコードリスナ */
+    private DatabaseRecordListener listener;
 
     /**
      * {@code DatabaseRecordReader}オブジェクトを生成する。
@@ -103,6 +105,10 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
      */
     @SuppressWarnings("unchecked")
     private void readRecords() {
+        if (listener != null) {
+            listener.beforeReadRecords();
+        }
+
         if (statement != null) {
             records = statement.executeQuery().iterator();
         } else if (parameterizedSqlPStatement != null) {
@@ -144,4 +150,21 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
         return this;
     }
 
+    /**
+     * データベースレコードリスナを設定する。
+     * <p/>
+     * リスナに定義されたコールバック処理は、
+     * 処理対象レコードをキャッシュするためのデータベースアクセス前に実行される。
+     * <p/>
+     * 本リーダにリスナを設定することで、
+     * 処理対象レコードをデータベースから取得する前に任意の処理を実行することができる。
+     *
+     * @param listener データベースレコードリスナ
+     * @return このオブジェクト自体
+     */
+    @Published
+    public DatabaseRecordReader setListener(DatabaseRecordListener listener) {
+        this.listener = listener;
+        return this;
+    }
 }

@@ -9,21 +9,25 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.HashMap;
+import java.util.List;
 
+import nablarch.core.db.connection.AppDbConnection;
 import nablarch.core.db.connection.ConnectionFactory;
 import nablarch.core.db.connection.DbConnectionContext;
 import nablarch.core.db.connection.TransactionManagerConnection;
 import nablarch.core.db.statement.ParameterizedSqlPStatement;
 import nablarch.core.db.statement.SqlPStatement;
 import nablarch.core.db.statement.SqlRow;
+import nablarch.core.db.transaction.SimpleDbTransactionExecutor;
+import nablarch.core.db.transaction.SimpleDbTransactionManager;
 import nablarch.core.repository.SystemRepository;
 import nablarch.core.transaction.TransactionContext;
+import nablarch.core.transaction.TransactionFactory;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
 import nablarch.test.support.SystemRepositoryResource;
 import nablarch.test.support.db.helper.DatabaseTestRunner;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
-import nablarch.test.support.tool.Hereis;
 
 import org.junit.After;
 import org.junit.Before;
@@ -271,5 +275,59 @@ public class DatabaseRecordReaderTest {
         DataReader<SqlRow> reader = new DatabaseRecordReader();
         reader.close(new ExecutionContext());
         assertTrue(true);
+    }
+
+    /**
+     * データベースのレコードキャッシュ前に、設定されたリスナが動作すること
+     */
+    @Test
+    public void testBeforeListener() {
+        VariousDbTestHelper.setUpTable(
+                new ReaderBook("title1", "publisher1", "authors1"),
+                new ReaderBook("title2", "publisher2", "authors2"),
+                new ReaderBook("title3", "publisher3", "authors3"));
+
+
+        // テスト用のトランザクションマネージャをリポジトリに登録
+        ConnectionFactory connectionFactory = repositoryResource.getComponent("connectionFactory");
+        TransactionFactory transactionFactory = repositoryResource.getComponent("jdbcTransactionFactory");
+        SimpleDbTransactionManager manager = new SimpleDbTransactionManager();
+        manager.setDbTransactionName("testTransaction");
+        manager.setConnectionFactory(connectionFactory);
+        manager.setTransactionFactory(transactionFactory);
+        repositoryResource.addComponent("testTransaction", manager);
+
+        DatabaseRecordReader reader = new DatabaseRecordReader();
+        reader.setStatement(DbConnectionContext.getConnection().prepareStatement("SELECT * FROM READER_BOOK ORDER BY TITLE"));
+
+        // レコードをキャッシュする前に、PUBLISHERカラムの値を全て"change"に変更するSQLを発行するリスナを追加
+        reader.setListener(new DatabaseRecordListener() {
+            @Override
+            public void beforeReadRecords() {
+                SimpleDbTransactionManager manager = SystemRepository.get("testTransaction");
+                new SimpleDbTransactionExecutor<Void>(manager) {
+                    @Override
+                    public Void execute(AppDbConnection appDbConnection) {
+                        appDbConnection.prepareStatement("UPDATE READER_BOOK SET PUBLISHER = 'change'").executeUpdate();
+                        return null;
+                    }
+                }.doTransaction();
+            }
+        });
+
+        // カラムが全て更新されていること
+        assertThat(reader.read(null).getString("publisher"), is("change"));
+        assertThat(reader.read(null).getString("publisher"), is("change"));
+        assertThat(reader.read(null).getString("publisher"), is("change"));
+        assertThat(reader.read(null), is(nullValue()));
+
+        // レコードを追加して、キャッシュを最新化した場合に、追加したレコードも更新されていること。
+        VariousDbTestHelper.insert(new ReaderBook("title4", "publisher4", "authors4"));
+        reader.reopen(null);
+        assertThat(reader.read(null).getString("publisher"), is("change"));
+        assertThat(reader.read(null).getString("publisher"), is("change"));
+        assertThat(reader.read(null).getString("publisher"), is("change"));
+        assertThat(reader.read(null).getString("publisher"), is("change"));
+        assertThat(reader.read(null), is(nullValue()));
     }
 }
