@@ -1,6 +1,9 @@
 package nablarch.fw.reader;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import nablarch.core.db.statement.ParameterizedSqlPStatement;
@@ -9,7 +12,6 @@ import nablarch.core.db.statement.SqlRow;
 import nablarch.core.util.annotation.Published;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
-
 
 /**
  * データベースの参照結果を1レコードづつ読み込むデータリーダ。
@@ -29,6 +31,11 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
 
     /** 条件 */
     private Object condition;
+
+    /**
+     * {@link DatabaseRecordListener}のリスト
+     */
+    private List<DatabaseRecordListener> listeners = new ArrayList<DatabaseRecordListener>();
 
     /**
      * {@code DatabaseRecordReader}オブジェクトを生成する。
@@ -103,6 +110,10 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
      */
     @SuppressWarnings("unchecked")
     private void readRecords() {
+        for (DatabaseRecordListener listener : listeners) {
+            listener.beforeReadRecord();
+        }
+
         if (statement != null) {
             records = statement.executeQuery().iterator();
         } else if (parameterizedSqlPStatement != null) {
@@ -144,4 +155,14 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
         return this;
     }
 
+    /**
+     * データベースからのレコード取得前に実行するリスナを追加する。
+     * @param listener データベースからのレコード取得前に実行するリスナ
+     * @return このオブジェクト自体
+     */
+    @Published
+    public DatabaseRecordReader addListeners(DatabaseRecordListener... listener) {
+        listeners.addAll(Arrays.asList(listener));
+        return this;
+    }
 }
