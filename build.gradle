@@ -1,5 +1,5 @@
 group = 'com.nablarch.framework'
-version = '1.2.0'
+version = '1.2.1'
 description = 'バッチ処理方式を実現する'
 
 buildscript {
