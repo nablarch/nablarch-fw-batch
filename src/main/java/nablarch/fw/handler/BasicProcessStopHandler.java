@@ -1,5 +1,7 @@
 package nablarch.fw.handler;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import nablarch.core.ThreadContext;
 import nablarch.core.db.connection.AppDbConnection;
 import nablarch.core.db.statement.SqlPStatement;
@@ -68,12 +70,7 @@ public class BasicProcessStopHandler implements ProcessStopHandler, Initializabl
     private int exitCode = 1;
 
     /** 現在の処理件数 */
-    private final ThreadLocal<Integer> count = new ThreadLocal<Integer>() {
-        @Override
-        protected Integer initialValue() {
-            return 0;
-        }
-    };
+    private final AtomicInteger count = new AtomicInteger(0);
 
     /**
      * {@inheritDoc}
@@ -81,14 +78,12 @@ public class BasicProcessStopHandler implements ProcessStopHandler, Initializabl
      * 処理停止チェックを行う。
      */
     public Object handle(Object o, ExecutionContext context) {
-        int nowCount = count.get();
-        if (nowCount++ % checkInterval == 0) {
+        if (count.getAndIncrement() % checkInterval == 0) {
             if (isProcessStop(ThreadContext.getRequestId())) {
                 throw new ProcessStop(exitCode);
             }
-            nowCount = 1;
+            count.set(1);
         }
-        count.set(nowCount);
         return context.handleNext(o);
     }
 
