@@ -37,6 +37,11 @@ dependencies {
   
   testCompile "com.nablarch.framework:nablarch-common-jdbc:${nablarchCommonJdbcVersion}"
   testCompile "com.nablarch.framework:nablarch-core-dataformat:${nablarchCoreDataformatVersion}"
+  testCompile "com.nablarch.framework:nablarch-common-auth:${nablarchCommonAuthVersion}"
+  testCompile "com.nablarch.framework:nablarch-common-auth-jdbc:${nablarchCommonAuthJdbcVersion}"
+
+  // here is setting
+  testRuntime files('src/test/java/')
 }
 
 tasks.sonarRunner {
