@@ -123,7 +123,7 @@ public class DatabaseTableQueueReader implements DataReader<SqlRow> {
      * @param inputDataIdentifier 要求識別情報
      */
     @Published
-    protected static void writeLog(InputDataIdentifier inputDataIdentifier) {
+    protected void writeLog(InputDataIdentifier inputDataIdentifier) {
         LOGGER.logInfo("read database record. key info: " + inputDataIdentifier);
     }
 
