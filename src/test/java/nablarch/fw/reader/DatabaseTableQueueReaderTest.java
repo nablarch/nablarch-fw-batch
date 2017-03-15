@@ -299,6 +299,31 @@ public class DatabaseTableQueueReaderTest {
         assertLog(log.get(2), "key info: {ID=3, STATUS=0}");
     }
 
+    @Test
+    public void testOverrideWriteLog() throws Exception {
+
+        createTestData(1);
+
+        DatabaseRecordReader reader = new DatabaseRecordReader();
+        reader.setStatement(connection.prepareStatement(
+                "SELECT * FROM BATCH_REQUEST_TABLE WHERE STATUS = '0' ORDER BY ID"));
+        DatabaseTableQueueReader sut = new DatabaseTableQueueReader(reader, 1000, "ID", "STATUS") {
+            @Override
+            protected void writeLog(final InputDataIdentifier inputDataIdentifier) {
+                assertThat(inputDataIdentifier.get("ID")
+                                              .toString(), is("1"));
+                assertThat(inputDataIdentifier.get("STATUS")
+                                              .toString(), is("0"));
+            }
+        };
+
+        assertThat(sut.read(null)
+                      .getBigDecimal("id")
+                      .intValue(), is(1));
+        updateStatus();
+        assertThat(sut.read(null), is(nullValue()));
+    }
+
     /**
      * 待機時間分待機後にデータが取得できること
      *
