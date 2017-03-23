@@ -114,17 +114,6 @@
       <property name="processHaltColumnName" value="stop" />
     </component>
 
-    <!-- 開閉局制御ハンドラ -->
-    <component name="ServiceAvailabilityCheckHandler" class="nablarch.common.availability.ServiceAvailabilityCheckHandler">
-      <property name="serviceAvailability">
-        <component name="BasicServiceAvailability" class="nablarch.common.availability.BasicServiceAvailability">
-          <property name="tableName" value="batch_request" />
-          <property name="requestTableRequestIdColumnName" value="id" />
-          <property name="requestTableServiceAvailableColumnName" value="service" />
-        </component>
-      </property>
-    </component>
-
     <!-- データリーダハンドラ -->
     <component class="nablarch.fw.handler.DataReadHandler" />
 
@@ -141,7 +130,6 @@
       <list>
         <component-ref name="handlerQueue.DuplicateProcessCheckHandler.BasicDuplicateProcessChecker" />
         <component-ref name="handlerQueue.ProcessStopHandler" />
-        <component-ref name="handlerQueue.ServiceAvailabilityCheckHandler.BasicServiceAvailability" />
       </list>
     </property>
   </component>

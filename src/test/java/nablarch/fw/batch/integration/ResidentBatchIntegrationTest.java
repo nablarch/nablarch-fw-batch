@@ -387,60 +387,6 @@ public class ResidentBatchIntegrationTest {
     }
 
     /**
-     * 閉局中のテスト。
-     * <p/>
-     * 本テストケースでは、主に以下の点の確認を行う。
-     * <ul>
-     * <li>閉局中の場合はデータが処理されないこと</li>
-     * <li>開局後は処理が再開され、入力データが順次処理されること</li>
-     * <li>再度閉局した場合は、再びデータが処理されなくなること</li>
-     * <li>閉局中でもプロセス停止制御ハンドラでプロセスを停止できること</li>
-     * </ul>
-     */
-    @Test
-    public void testServiceUnavailable() throws Exception {
-        systemPropertyRule.setSystemProperty("threadCount", "1");
-
-        // setup data
-        setupInputData(1, 5);
-
-        // 閉局中ステータスに
-        changeServiceStatus("01", "0");
-
-        Future<Integer> future = executeBatch();
-
-        // 一定時間待機してみる
-        Thread.sleep(2000);
-
-        assertThat("対象データは未処理のままのこっていること", findUntreatedRecord().size(), is(5));
-
-        ThreadControlHandler.countDownLatch = new CountDownLatch(5);
-        changeServiceStatus("01", "1");
-        ThreadControlHandler.countDownLatch.await(5, TimeUnit.MINUTES);
-        assertThat("開局されたので全データ処理されること", findUntreatedRecord().size(), is(0));
-        assertThat("正常に処理されていること", findSuccessRecord().size(), is(5));
-
-        // add input record
-        ThreadControlHandler.countDownLatch = new CountDownLatch(5);
-        setupInputData(10, 5);
-        ThreadControlHandler.countDownLatch.await(5, TimeUnit.MINUTES);
-        assertThat("追加されたレコードも処理される", findUntreatedRecord().size(), is(0));
-        assertThat("正常に処理されていること", findSuccessRecord().size(), is(10));
-
-        // 閉局中ステータスに
-        changeServiceStatus("01", "0");
-        // BatchActionHandlerのreaderよりも若干おおめに。
-        // 開閉局ハンドラ通過後だと、処理してしまうので、閉局を読み取るまで少し待つ。
-        Thread.sleep(1500);
-        setupInputData(100, 10);
-
-        Thread.sleep(5000);
-        stopBatchProcess("01");
-        assertThat("プロセスが正常に終了すること", future.get(), is(0));
-        assertThat("閉局後のレコードは未処理のまま残っていること", findUntreatedRecord().size(), is(10));
-    }
-
-    /**
      * 処理遅延が発生しているスレッドがある場合のテスト。
      * <p/>
      * 本テストケースでは、主に以下の点の確認を行う。
