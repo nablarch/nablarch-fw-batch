@@ -1,5 +1,26 @@
 package nablarch.fw.batch.integration;
 
+import static org.hamcrest.CoreMatchers.*;
+import static org.junit.Assert.assertThat;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
 import nablarch.common.io.FileRecordWriterHolder;
 import nablarch.core.dataformat.FileRecordWriter;
 import nablarch.core.db.statement.SqlRow;
@@ -16,17 +37,14 @@ import nablarch.fw.launcher.Main;
 import nablarch.test.support.db.helper.DatabaseTestRunner;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
 import nablarch.test.support.log.app.OnMemoryLogWriter;
-import nablarch.test.support.tool.Hereis;
-import org.junit.*;
+
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
-
-import java.io.File;
-import java.util.*;
-import java.util.concurrent.*;
-
-import static org.hamcrest.CoreMatchers.*;
-import static org.junit.Assert.assertThat;
 
 /**
  * 常駐バッチ処理の機能結合テストクラス。
@@ -455,20 +473,20 @@ public class ResidentBatchIntegrationTest {
     @Test
     public void testCloseWriteFile() throws Exception {
 
-        // フォーマットファイル作成
-        Hereis.file(new File(folder.getRoot(), "test").getAbsolutePath());
-        /*
-        file-type:        "Fixed" # 固定長
-        text-encoding:    "MS932" # 文字列型フィールドの文字エンコーディング
-        record-length:    5     # 各レコードの長さ
-        record-separator: "\r\n"  # 改行コード(crlf)
-
-        [Classifier] # レコードタイプ識別フィールド定義
-
-        [data] # データレコード
-        1   id                     X(5)
-        */
-
+        final File formatFile = new File(folder.getRoot(), "test");
+        final BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(formatFile), "utf-8"));
+        try {
+            writer.write("file-type:        \"Fixed\" # 固定長\n");
+            writer.write("text-encoding:    \"MS932\" # 文字列型フィールドの文字エンコーディング\n");
+            writer.write("record-length:    5     # 各レコードの長さ\n");
+            writer.write("record-separator: \"\\r\\n\"  # 改行コード(crlf)\n");
+            writer.write("[Classifier] # レコードタイプ識別フィールド定義\n");
+            writer.write("[data] # データレコード\n");
+            writer.write("1   id                     X(5)\n");
+        } finally {
+            writer.close();
+        }
         FileRecordWriterStub.closeFiles.clear();
         systemPropertyRule.setSystemProperty("threadCount", "1");
 

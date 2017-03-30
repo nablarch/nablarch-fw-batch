@@ -6,9 +6,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.nio.charset.Charset;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -24,7 +22,6 @@ import nablarch.test.support.db.helper.DatabaseTestRunner;
 import nablarch.test.support.db.helper.TargetDb;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
 import nablarch.test.support.handler.CatchingHandler;
-import nablarch.test.support.tool.Hereis;
 
 import org.junit.After;
 import org.junit.Before;

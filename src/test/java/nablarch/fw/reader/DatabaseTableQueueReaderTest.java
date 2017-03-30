@@ -3,8 +3,6 @@ package nablarch.fw.reader;
 import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
-import static org.junit.matchers.JUnitMatchers.containsString;
-import static org.junit.matchers.JUnitMatchers.hasItems;
 
 import java.sql.Types;
 import java.util.ArrayList;
@@ -415,11 +413,11 @@ public class DatabaseTableQueueReaderTest {
     public void specifiedPrimaryKeyNull() throws Exception {
         DatabaseRecordReader reader = new DatabaseRecordReader();
         SqlPStatement statement = connection.prepareStatement(
-                "SELECT * FROM BATCH_REQUEST_TEST WHERE STATUS = '0' ORDER BY ID");
+                "SELECT * FROM BATCH_REQUEST_TABLE WHERE STATUS = '0' ORDER BY ID");
         reader.setStatement(statement);
 
         try {
-            new DatabaseTableQueueReader(reader, 1000, null);
+            new DatabaseTableQueueReader(reader, 1000, (String[]) null);
             fail("ここはとおらない");
         } catch (IllegalArgumentException e) {
             assertThat(e.getMessage(), is("primary keys must be set."));
@@ -435,7 +433,7 @@ public class DatabaseTableQueueReaderTest {
 
         DatabaseRecordReader reader = new DatabaseRecordReader();
         SqlPStatement statement = connection.prepareStatement(
-                "SELECT * FROM BATCH_REQUEST_TEST WHERE STATUS = '0' ORDER BY ID");
+                "SELECT * FROM BATCH_REQUEST_TABLE WHERE STATUS = '0' ORDER BY ID");
         reader.setStatement(statement);
 
         try {
@@ -455,7 +453,7 @@ public class DatabaseTableQueueReaderTest {
 
         DatabaseRecordReader reader = new DatabaseRecordReader();
         SqlPStatement statement = connection.prepareStatement(
-                "SELECT * FROM BATCH_REQUEST_TEST WHERE STATUS = '0' ORDER BY ID");
+                "SELECT * FROM BATCH_REQUEST_TABLE WHERE STATUS = '0' ORDER BY ID");
         reader.setStatement(statement);
 
         try {
