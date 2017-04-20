@@ -17,13 +17,16 @@
  * 実際のレコード読み込み処理は、{@link FileRecordReader}に委譲する。
  * <p/>
  * このクラスを使用するにあたって設定が必須となるプロパティの実装例を下記に示す。
- * <pre><code>
+ * <pre>{@code
  *     FileDataReader reader = new FileDataReader()
  *         //フォーマット定義ファイルのベースパス論理名とフォーマット定義ファイル名(拡張子無し)を設定する。
  *         .setLayoutFile("format", "formatFile")
  *         //データファイルベースパス論理名とデータファイル名(拡張子無し)を設定する。
  *         .setDataFile("input", "dataFile");
- * </code></pre>
+ * }</pre>
+ * 
+ * このクラスは読み込み対象のファイルやフォーマット定義ファイルが存在しない場合には例外を送出する。
+ * 読み込み対象のファイルが空(0バイト)の場合は、例外の送出は行わない。
  *
  * @author Masato Inoue
  */
