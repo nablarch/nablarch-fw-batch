@@ -451,11 +451,11 @@ public class ResidentBatchIntegrationTest {
 
         stopBatchProcess("01");
 
+        assertThat("プロセスが正常終了していること", future.get(), is(0));
         assertThat("処理が遅いデータも処理済みになっていること", findUntreatedRecord().size(), is(0));
         assertThat("全レコード正常に処理済みになっている", findSuccessRecord().size(), is(9));
         assertThat("全て出力テーブルに書き込まれていること", findOutputTable().size(), is(9));
 
-        assertThat("プロセスが正常終了していること", future.get(), is(0));
 
     }
 
@@ -510,11 +510,10 @@ public class ResidentBatchIntegrationTest {
 
         stopBatchProcess("01");
 
+        assertThat("プロセスが正常に終了していること", future.get(), is(0));
         assertThat("入力レコード数分のファイルが閉じられていること", FileRecordWriterStub.closeFiles.size(), is(3));
         assertThat("閉じられたファイルのファイル名を確認", FileRecordWriterStub.closeFiles,
                 hasItems("file_1", "file_2", "file_3"));
-
-        assertThat("プロセスが正常に終了していること", future.get(), is(0));
 
     }
 
@@ -597,6 +596,12 @@ public class ResidentBatchIntegrationTest {
         VariousDbTestHelper.setUpTable(
                 new TestBatchRequest3(id,testBatchRequest3.act,"1",testBatchRequest3.service)
         );
+
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
