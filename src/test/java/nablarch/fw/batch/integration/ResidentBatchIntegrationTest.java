@@ -44,6 +44,7 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 
 /**
@@ -56,6 +57,9 @@ import org.junit.runner.RunWith;
  */
 @RunWith(DatabaseTestRunner.class)
 public class ResidentBatchIntegrationTest {
+    /** テストメソッド名取得ルール */
+    @Rule
+    public TestName testName = new TestName();
 
     /** システムプロパティ復元用ルール */
     @Rule
@@ -94,6 +98,7 @@ public class ResidentBatchIntegrationTest {
      */
     @Before
     public void setUp() throws Exception {
+        System.out.println("nablarch.fw.batch.integration.ResidentBatchIntegrationTest#" + testName.getMethodName() + " start");
         System.clearProperty("nablarch.appLog.filePath");
         LogUtil.removeAllObjectsBoundToContextClassLoader();
         OnMemoryLogWriter.clear();
@@ -274,6 +279,8 @@ public class ResidentBatchIntegrationTest {
 
         // assert log
         List<String> logMessages = OnMemoryLogWriter.getMessages("writer.appLog");
+        System.out.println("nablarch.fw.batch.integration.ResidentBatchIntegrationTest#testAbnormalEndRecord  writer.appLog");
+        sysOutLogMessages(logMessages);
         List<String> fatalLog = new ArrayList<String>();
         for (String message : logMessages) {
             if (message.contains("FATAL")) {
@@ -331,6 +338,8 @@ public class ResidentBatchIntegrationTest {
 
         // assert log
         List<String> logMessages = OnMemoryLogWriter.getMessages("writer.appLog");
+        System.out.println("nablarch.fw.batch.integration.ResidentBatchIntegrationTest#testMultiAbnormalEndRecord writer.appLog");
+        sysOutLogMessages(logMessages);
         List<String> fatalLog = new ArrayList<String>();
         for (String message : logMessages) {
             if (message.contains("FATAL")) {
@@ -763,6 +772,22 @@ public class ResidentBatchIntegrationTest {
             }
         });
         return inputInfo;
+    }
+
+    /**
+     * {@link OnMemoryLogWriter} から取得したメッセージを引数として受け取り、標準出力に出力する。
+     * @param logMessages {@link OnMemoryLogWriter} から取得したメッセージ
+     */
+    private void sysOutLogMessages(List<String> logMessages) {
+        StringBuilder writerAppLogBuffer = new StringBuilder();
+        for (int i = 0; i < logMessages.size(); i++) {
+            writerAppLogBuffer.append("[");
+            writerAppLogBuffer.append(i);
+            writerAppLogBuffer.append("]");
+            writerAppLogBuffer.append(logMessages.get(i));
+            writerAppLogBuffer.append(System.getProperty("line.separator"));
+        }
+        System.out.println(writerAppLogBuffer.toString());
     }
 
     public static class ThreadControlHandler implements Handler<SqlRow, Object> {
