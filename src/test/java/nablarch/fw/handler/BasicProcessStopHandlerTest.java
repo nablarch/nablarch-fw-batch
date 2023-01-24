@@ -246,7 +246,7 @@ public class BasicProcessStopHandlerTest {
         try {
             for (int i = 0; i < 30; i++) {
                 result.add(String.valueOf(new ExecutionContext(context)
-                        .handleNext(
+                        .<String, String>handleNext(
                                 String.valueOf(i))));
             }
             fail("dose not run.");
@@ -307,7 +307,7 @@ public class BasicProcessStopHandlerTest {
         try {
             for (int i = 0; i < 30; i++) {
                 result.add(String.valueOf(new ExecutionContext(context)
-                        .handleNext(
+                        .<String, String>handleNext(
                                 String.valueOf(i))));
             }
             fail("dose not run.");
