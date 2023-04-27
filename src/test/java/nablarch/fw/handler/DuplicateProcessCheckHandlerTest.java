@@ -1,26 +1,27 @@
 package nablarch.fw.handler;
 
-import static org.hamcrest.CoreMatchers.*;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
-
-import java.util.ArrayList;
-import java.util.List;
-
 import nablarch.core.ThreadContext;
 import nablarch.fw.ExecutionContext;
 import nablarch.fw.Handler;
 import nablarch.fw.handler.DuplicateProcessCheckHandler.DuplicateProcess;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
 import nablarch.test.support.log.app.OnMemoryLogWriter;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import mockit.Expectations;
-import mockit.Mocked;
-import mockit.Verifications;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * {@link DuplicateProcessCheckHandler}のテストクラス。
@@ -33,8 +34,7 @@ public class DuplicateProcessCheckHandlerTest {
     DuplicateProcessCheckHandler sut = new DuplicateProcessCheckHandler();
 
     /** 多重起動チェックのモックオブジェクト */
-    @Mocked
-    DuplicateProcessChecker mockChecker;
+    DuplicateProcessChecker mockChecker = mock(DuplicateProcessChecker.class);
 
     @Before
     public void setUp() throws Exception {
@@ -65,10 +65,8 @@ public class DuplicateProcessCheckHandlerTest {
             }
         }));
 
-        new Verifications() {{
-            mockChecker.checkAndActive("RW000003");
-            mockChecker.inactive("RW000003");
-        }};
+        verify(mockChecker, atLeastOnce()).checkAndActive("RW000003");
+        verify(mockChecker, atLeastOnce()).inactive("RW000003");
     }
 
     /**
@@ -81,10 +79,7 @@ public class DuplicateProcessCheckHandlerTest {
 
         ThreadContext.setRequestId("RW000002");
 
-        new Expectations() {{
-            mockChecker.checkAndActive("RW000002");
-            result = new AlreadyProcessRunningException();
-        }};
+        doThrow(new AlreadyProcessRunningException()).when(mockChecker).checkAndActive("RW000002");
 
         try {
             sut.handle(null, new ExecutionContext());
@@ -105,10 +100,7 @@ public class DuplicateProcessCheckHandlerTest {
     @Test
     public void testAlreadyRunningExitCode() throws Exception {
 
-        new Expectations() {{
-            mockChecker.checkAndActive("RW000004");
-            result = new AlreadyProcessRunningException();
-        }};
+        doThrow(new AlreadyProcessRunningException()).when(mockChecker).checkAndActive("RW000004");
 
 
         // テストの準備
@@ -156,11 +148,9 @@ public class DuplicateProcessCheckHandlerTest {
             assertThat(e.getMessage(), is("error!"));
         }
 
-        new Verifications() {{
-            mockChecker.checkAndActive("RW000003");
-            // 例外が発生しても非アクティブ化が呼び出されること。
-            mockChecker.inactive("RW000003");
-        }};
+        verify(mockChecker, atLeastOnce()).checkAndActive("RW000003");
+        // 例外が発生しても非アクティブ化が呼び出されること。
+        verify(mockChecker, atLeastOnce()).inactive("RW000003");
 
     }
 
@@ -172,10 +162,7 @@ public class DuplicateProcessCheckHandlerTest {
      */
     @Test
     public void testSetExitCode() throws Exception {
-        new Expectations() {{
-            mockChecker.checkAndActive("RW000002");
-            result = new AlreadyProcessRunningException();
-        }};
+        doThrow(new AlreadyProcessRunningException()).when(mockChecker).checkAndActive("RW000002");
 
         ThreadContext.setRequestId("RW000002");
 
@@ -216,10 +203,7 @@ public class DuplicateProcessCheckHandlerTest {
     @Test
     public void testNormalBodyAndFailedFinally() throws Exception {
 
-        new Expectations() {{
-            mockChecker.inactive("RW000002");
-            result = new IllegalStateException("IllegalStateException:error");
-        }};
+        doThrow(new IllegalStateException("IllegalStateException:error")).when(mockChecker).inactive("RW000002");
 
         final ExecutionContext context = new ExecutionContext();
         context.addHandler(sut);
@@ -250,10 +234,7 @@ public class DuplicateProcessCheckHandlerTest {
     @Test
     public void testExceptionBodyAndFailedFinally() throws Exception {
 
-        new Expectations() {{
-            mockChecker.inactive("RW000002");
-            result = new OutOfMemoryError("");
-        }};
+        doThrow(new OutOfMemoryError("")).when(mockChecker).inactive("RW000002");
 
         ExecutionContext context = new ExecutionContext();
         context.addHandler(sut);
@@ -285,10 +266,7 @@ public class DuplicateProcessCheckHandlerTest {
     @Test
     public void testErrorBodyAndFailedFinally() throws Exception {
 
-        new Expectations() {{
-            mockChecker.inactive("RW000002");
-            result = new NullPointerException("null error.");
-        }};
+        doThrow(new NullPointerException("null error.")).when(mockChecker).inactive("RW000002");
 
         final ExecutionContext context = new ExecutionContext();
         context.addHandler(sut);
