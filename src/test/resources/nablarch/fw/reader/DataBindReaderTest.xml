@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component-configuration
+    xmlns="http://tis.co.jp/nablarch/component-configuration"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://tis.co.jp/nablarch/component-configuration">
+
+  <!-- ObjectMapperFactoryの設定 -->
+  <component name="objectMapperFactory" class="nablarch.common.databind.BasicObjectMapperFactory" />
+
+  <component name="filePathSetting" class="nablarch.core.util.FilePathSetting">
+    <property name="fileExtensions">
+      <map>
+        <entry key="input" value="csv" />
+      </map>
+    </property>
+    <property name="basePathSettings">
+      <map>
+        <entry key="input" value="file:${java.io.tmpdir}" />
+      </map>
+    </property>
+  </component>
+
+</component-configuration>
