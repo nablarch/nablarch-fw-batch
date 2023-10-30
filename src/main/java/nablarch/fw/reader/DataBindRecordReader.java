@@ -7,13 +7,13 @@ import nablarch.core.util.StringUtil;
 import nablarch.core.util.annotation.Published;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
+import nablarch.fw.reader.iterator.ObjectMapperIterator;
 
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
-import java.util.Iterator;
 
 /**
  * ファイルデータを１レコードづつ読み込み、
@@ -56,6 +56,11 @@ public class DataBindRecordReader<T> implements DataReader<T> {
     /** オブジェクトマッパーイテレータ。 */
     private ObjectMapperIterator<T> iterator;
 
+    /**
+     * コンストラクタ。
+     *
+     * @param inputDataType 入力データの型
+     */
     public DataBindRecordReader(Class<T> inputDataType) {
         this.inputDataType = inputDataType;
     }
@@ -113,12 +118,24 @@ public class DataBindRecordReader<T> implements DataReader<T> {
         return this;
     }
 
+    /**
+     * ファイル読み込み時にバッファーを使用するか否かを設定する。
+     *
+     * @param useBuffer バッファーを使用する場合は {@code true}
+     * @return このオブジェクト自体
+     */
     @Published(tag = "architect")
     public DataBindRecordReader<T> setUseBuffer(boolean useBuffer) {
         this.useBuffer = useBuffer;
         return this;
     }
 
+    /**
+     * ファイル読み込み時のバッファーサイズを設定する。
+     *
+     * @param bufferSize バッファーサイズ
+     * @return このオブジェクト自体
+     */
     @Published(tag = "architect")
     public DataBindRecordReader<T> setBufferSize(int bufferSize) {
         if(bufferSize <= 0) {
@@ -129,25 +146,42 @@ public class DataBindRecordReader<T> implements DataReader<T> {
     }
 
     /**
-     * {@link ObjectMapper}を生成する。
+     * {@link ObjectMapperIterator}を設定する。
+     * <p>
+     * すでに設定されている場合は、まずクローズしてから設定する。
      *
-     * @return {@link ObjectMapper}オブジェクト
+     * @param objectMapperIterator オブジェクトマッパーイテレータ
+     */
+    protected void setObjectMapperIterator(ObjectMapperIterator<T> objectMapperIterator) {
+        if (null != iterator) {
+            iterator.close();
+        }
+        iterator = objectMapperIterator;
+    }
+
+    /**
+     * オブジェクトマッパーイテレータを生成する。
+     *
+     * @return {@link ObjectMapperIterator}オブジェクト
      * @throws IllegalStateException 必須であるプロパティが設定されていない場合、読み込み対象のファイルが存在しない場合
      */
     private ObjectMapperIterator<T> createObjectMapperIterator() {
-        File dataFile = getDataFile();
-        // ファイルの読み出しに利用するイテレータを生成
         try {
-            InputStream is = new FileInputStream(dataFile);
+            InputStream is = new FileInputStream(getDataFile());
             if (useBuffer) {
-                return new ObjectMapperIterator<T>(ObjectMapperFactory.create(inputDataType, new BufferedInputStream(is, bufferSize)));
+                return new ObjectMapperIterator<>(ObjectMapperFactory.create(inputDataType, new BufferedInputStream(is, bufferSize)));
             }
-            return new ObjectMapperIterator<T>(ObjectMapperFactory.create(inputDataType, is));
+            return new ObjectMapperIterator<>(ObjectMapperFactory.create(inputDataType, is));
         } catch (FileNotFoundException e) {
             throw new IllegalStateException(e);
         }
     }
 
+    /**
+     * データファイルオブジェクトを取得する。
+     *
+     * @return {@link File} データファイルオブジェクト
+     */
     private File getDataFile() {
         if (StringUtil.isNullOrEmpty(dataFileName)) {
             throw new IllegalStateException("data file name was blank. data file name must not be blank.");
@@ -156,64 +190,7 @@ public class DataBindRecordReader<T> implements DataReader<T> {
             throw new IllegalStateException("data file base path name was blank. data file base path name must not be blank.");
         }
 
-        // データファイルオブジェクトの生成
         FilePathSetting filePathSetting = FilePathSetting.getInstance();
         return filePathSetting.getFileWithoutCreate(dataFileBasePathName, dataFileName);
-    }
-
-    private static class ObjectMapperIterator<E> implements Iterator<E> {
-
-        /**　オブジェクトマッパー */
-        private final ObjectMapper<E> mapper;
-
-        /** データ1行分のオブジェクト */
-        private E form;
-
-        /**
-         * {@link ObjectMapper}を引数にObjectMapperIteratorを生成する。
-         *
-         * @param mapper イテレートするマッパ
-         */
-        public ObjectMapperIterator(ObjectMapper<E> mapper) {
-            this.mapper = mapper;
-
-            // 初回分のデータを読み込む
-            form = mapper.read();
-        }
-
-        /**
-         * 次の行があるかどうかを返す。
-         *
-         * @return {@code true} 次の行がある場合、 {@code false} 次の行がない場合
-         */
-        @Override
-        public boolean hasNext() {
-            return (form != null);
-        }
-
-        /**
-         * 1行分のデータを返す。
-         *
-         * @return 1行分のデータ
-         */
-        @Override
-        public E next() {
-
-            final E current = form;
-            form = mapper.read();
-            return current;
-        }
-
-        @Override
-        public void remove() {
-            throw new UnsupportedOperationException();
-        }
-
-        /**
-         * マッパをクローズする。
-         */
-        public void close() {
-            mapper.close();
-        }
     }
 }

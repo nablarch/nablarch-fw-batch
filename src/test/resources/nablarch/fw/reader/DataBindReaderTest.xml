@@ -4,6 +4,9 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://tis.co.jp/nablarch/component-configuration">
 
+  <!-- 文字集合の設定 -->
+  <import file="nablarch/core/validation/charset-definition.xml"/>
+
   <!-- ObjectMapperFactoryの設定 -->
   <component name="objectMapperFactory" class="nablarch.common.databind.BasicObjectMapperFactory" />
 

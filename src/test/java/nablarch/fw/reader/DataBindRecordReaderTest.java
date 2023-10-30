@@ -4,14 +4,13 @@ import nablarch.fw.ExecutionContext;
 import nablarch.fw.TestSupport;
 import nablarch.test.support.SystemRepositoryResource;
 import org.junit.After;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import static org.hamcrest.CoreMatchers.allOf;
 import static org.hamcrest.CoreMatchers.containsString;
@@ -37,10 +36,6 @@ public class DataBindRecordReaderTest {
 
     private DataBindRecordReader<DataBindTestForm> sut = null;
 
-    @Before
-    public void setUp() throws Exception {
-    }
-
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @After
     public void tearDown() throws Exception {
@@ -55,10 +50,10 @@ public class DataBindRecordReaderTest {
 
     @Test
     public void ファイルを読み込めること() throws Exception {
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class)
-                        .setDataFile("record");
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
+                .setDataFile("record");
 
-        TestSupport.createFile(dataFile, "\r\n", Charset.forName("UTF-8"),
+        TestSupport.createFile(dataFile, "\r\n", StandardCharsets.UTF_8,
                 "年齢,氏名",
                 "20,山田太郎",
                 "30,鈴木次郎",
@@ -83,10 +78,10 @@ public class DataBindRecordReaderTest {
 
     @Test
     public void hasNextなしでreadを呼び出した場合もファイルを読み込めること() throws Exception {
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class)
-                        .setDataFile("record");
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
+                .setDataFile("record");
 
-        TestSupport.createFile(dataFile, "\r\n", Charset.forName("UTF-8"),
+        TestSupport.createFile(dataFile, "\r\n", StandardCharsets.UTF_8,
                 "年齢,氏名",
                 "20,山田太郎",
                 "30,鈴木次郎",
@@ -107,14 +102,34 @@ public class DataBindRecordReaderTest {
 
     @Test
     public void 初期化前にcloseを呼び出した場合は例外が送出されないこと() throws Exception {
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class)
-                        .setDataFile("record");
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
+                .setDataFile("record");
         sut.close(new ExecutionContext());
     }
 
     @Test
+    public void close後にデータリーダにアクセスした場合は例外が発生しないこと() throws Exception {
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
+                .setDataFile("record");
+
+        TestSupport.createFile(dataFile, "\r\n", StandardCharsets.UTF_8,
+                "年齢,氏名",
+                "20,山田太郎",
+                "30,鈴木次郎",
+                "40,佐藤花子"
+        );
+
+        ExecutionContext ctx = new ExecutionContext();
+
+        sut.read(ctx);
+        sut.close(ctx);
+        assertFalse(sut.hasNext(ctx));
+        assertNull(sut.read(ctx));
+    }
+
+    @Test
     public void データファイルが存在しない場合は例外が送出されること() throws Exception {
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class)
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
                 .setDataFile("record");
 
         expectedException.expect(IllegalStateException.class);
@@ -129,7 +144,7 @@ public class DataBindRecordReaderTest {
 
     @Test
     public void データファイルを指定しない場合は例外が送出されること() throws Exception {
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class);
+        sut = new DataBindRecordReader<>(DataBindTestForm.class);
 
         expectedException.expect(IllegalStateException.class);
         expectedException.expectMessage("data file name was blank. data file name must not be blank.");
@@ -139,7 +154,7 @@ public class DataBindRecordReaderTest {
 
     @Test
     public void データファイルにnullを指定した場合は例外が送出されること() throws Exception {
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class)
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
                 .setDataFile(null);
 
         expectedException.expect(IllegalStateException.class);
@@ -150,7 +165,7 @@ public class DataBindRecordReaderTest {
 
     @Test
     public void データファイルのベースパスにnullを指定した場合は例外が送出されること() throws Exception {
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class)
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
                 .setDataFile(null, "record");
 
         expectedException.expect(IllegalStateException.class);
@@ -161,10 +176,10 @@ public class DataBindRecordReaderTest {
 
     @Test
     public void データファイルが空の場合は例外が送出されないこと() throws Exception {
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class)
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
                 .setDataFile("record");
 
-        TestSupport.createFile(dataFile, "\r\n", Charset.forName("UTF-8"));
+        TestSupport.createFile(dataFile, "\r\n", StandardCharsets.UTF_8);
 
         assertTrue(dataFile.exists());
         assertFalse(sut.hasNext(new ExecutionContext()));
@@ -172,11 +187,11 @@ public class DataBindRecordReaderTest {
 
     @Test
     public void バッファーを使用しない場合でもデータを読み込めること() throws Exception {
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class)
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
                 .setDataFile("record")
                 .setUseBuffer(false);
 
-        TestSupport.createFile(dataFile, "\r\n", Charset.forName("UTF-8"),
+        TestSupport.createFile(dataFile, "\r\n", StandardCharsets.UTF_8,
                 "年齢,氏名",
                 "20,山田太郎",
                 "30,鈴木次郎",
@@ -202,11 +217,11 @@ public class DataBindRecordReaderTest {
 
     @Test
     public void バッファーサイズを変更してもデータを読み込めること() throws Exception {
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class)
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
                 .setDataFile("record")
                 .setBufferSize(10);
 
-        TestSupport.createFile(dataFile, "\r\n", Charset.forName("UTF-8"),
+        TestSupport.createFile(dataFile, "\r\n", StandardCharsets.UTF_8,
                 "年齢,氏名",
                 "20,山田太郎",
                 "30,鈴木次郎",
@@ -234,7 +249,7 @@ public class DataBindRecordReaderTest {
     public void 不正なバッファーサイズ指定時には例外が発生すること() throws Exception {
         expectedException.expect(IllegalArgumentException.class);
         expectedException.expectMessage("buffer size was invalid. buffer size must be greater than 0.");
-        sut = new DataBindRecordReader<DataBindTestForm>(DataBindTestForm.class)
+        sut = new DataBindRecordReader<>(DataBindTestForm.class)
                 .setDataFile("record")
                 .setBufferSize(0);
     }
