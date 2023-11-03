@@ -146,7 +146,7 @@ public class DatabaseTableQueueReaderTest {
 
         // 別スレッドでデータをリード
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<SqlRow> future = executor.submit(new DataReadTask(sut));
+        Future<SqlRow> future = executor.submit(new DataReadTask<>(sut));
         executor.shutdown();
         SqlRow row = future.get();
         assertThat("子スレッド側でデータが読み込めていること", row.getBigDecimal("id")
@@ -169,18 +169,18 @@ public class DatabaseTableQueueReaderTest {
 
         // 別スレッドでデータをリード
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<SqlRow> future = executor.submit(new DataReadTask(sut));
+        Future<SqlRow> future = executor.submit(new DataReadTask<>(sut));
         assertThat("子スレッド側でデータが読み込めること", future.get()
                                                .getBigDecimal("id")
                                                .intValue(), is(1));
 
-        future = executor.submit(new DataReadTask(sut));
+        future = executor.submit(new DataReadTask<>(sut));
         assertThat("子スレッドで再度リードした場合同じレコードが読み込めること", future.get()
                                                           .getBigDecimal("id")
                                                           .intValue(), is(1));
 
         updateStatus();
-        future = executor.submit(new DataReadTask(sut));
+        future = executor.submit(new DataReadTask<>(sut));
         assertThat("処理済みになった場合は読み取れない", future.get(), is(nullValue()));
         executor.shutdown();
     }
@@ -196,7 +196,7 @@ public class DatabaseTableQueueReaderTest {
         ExecutorService executor = Executors.newFixedThreadPool(5);
 
         List<Future<SqlRow>> result = new ArrayList<Future<SqlRow>>(5);
-        DataReadTask task = new DataReadTask(sut);
+        DataReadTask<SqlRow> task = new DataReadTask<>(sut);
         for (int i = 0; i < 5; i++) {
             result.add(executor.submit(task));
         }
@@ -247,7 +247,7 @@ public class DatabaseTableQueueReaderTest {
         final DatabaseTableQueueReader sut = new DatabaseTableQueueReader(reader, 1000, "id1", "id2");
 
         ExecutorService executor = Executors.newFixedThreadPool(4);
-        Callable<SqlRow> task = new DataReadTask(sut);
+        Callable<SqlRow> task = new DataReadTask<>(sut);
         List<Future<SqlRow>> result = new ArrayList<Future<SqlRow>>();
         for (int i = 0; i < 4; i++) {
             result.add(executor.submit(task));
@@ -513,21 +513,5 @@ public class DatabaseTableQueueReaderTest {
         connection.commit();
     }
 
-    /**
-     * リーダからデータをリードし、リードした値を返却するタスク。
-     */
-    private static class DataReadTask implements Callable<SqlRow> {
-
-        private final DatabaseTableQueueReader reader;
-
-        public DataReadTask(DatabaseTableQueueReader reader) {
-            this.reader = reader;
-        }
-
-        @Override
-        public SqlRow call() throws Exception {
-            return reader.read(null);
-        }
-    }
 }
 

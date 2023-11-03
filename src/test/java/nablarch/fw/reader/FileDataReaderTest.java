@@ -1,5 +1,7 @@
 package nablarch.fw.reader;
 
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -14,11 +16,18 @@ import java.io.OutputStreamWriter;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import nablarch.core.ThreadContext;
 import nablarch.core.dataformat.DataRecord;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
+import nablarch.fw.SynchronizedDataReaderWrapper;
 import nablarch.fw.TestSupport;
 import nablarch.test.support.SystemRepositoryResource;
 
@@ -37,6 +46,7 @@ import org.junit.rules.ExpectedException;
  *
  * @author Masato Inoue
  */
+@SuppressWarnings("NonAsciiCharacters")
 public class FileDataReaderTest {
 
     @Rule
@@ -58,7 +68,7 @@ public class FileDataReaderTest {
 
         // データフォーマット定義ファイル
         File formatFile = new File(tempDir, "format.fmt");
-        TestSupport.createFile(formatFile, Charset.forName("UTF-8"),
+        TestSupport.createFile(formatFile, StandardCharsets.UTF_8,
                 "file-type:    \"Fixed\"",
                 "text-encoding: \"sjis\"",
                 "record-length: 80",
@@ -405,4 +415,51 @@ public class FileDataReaderTest {
         expectedException.expectMessage("notFound.fmt");
         dataReader.createFileRecordReader();
     }
+
+
+    @Test
+    public void synchronizedでラップした場合_スレッドセーフな挙動となっていること() throws Exception {
+        // データフォーマット定義ファイル
+        File formatFile = new File(tempDir, "format2.fmt");
+        TestSupport.createFile(formatFile, StandardCharsets.UTF_8,
+                "file-type:    \"Fixed\"",
+                "text-encoding: \"sjis\"",
+                "record-length: 10",
+                "",
+                "[Default]",
+                "1  byteString X(10)"
+        );
+
+        OutputStream dest = new FileOutputStream(new File(tempDir, "record.dat"), false);
+        dest.write("ｱｲｳｴｵｶｷｸｹｺ".getBytes("sjis"));
+        dest.write("ｻｼｽｾｿﾀﾁﾂﾃﾄ".getBytes("sjis"));
+        dest.write("ﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎ".getBytes("sjis"));
+        dest.write("ﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘ".getBytes("sjis"));
+        dest.close();
+
+        sut = new FileDataReader()
+                .setLayoutFile("format2")
+                .setDataFile("record");
+
+        SynchronizedDataReaderWrapper<DataRecord> testReader = new SynchronizedDataReaderWrapper<>(sut);
+
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+
+        List<DataReadTask<DataRecord>> tasks = new ArrayList<>(4);
+        DataReadTask<DataRecord> task = new DataReadTask<>(testReader);
+        for (int i = 0; i < 4; i++) {
+            tasks.add(task);
+        }
+
+        List<Future<DataRecord>> result = executor.invokeAll(tasks);
+
+        List<String> actualList = new ArrayList<>();
+        for (Future<DataRecord> future : result) {
+            actualList.add((String) future.get().get("byteString"));
+        }
+
+        assertThat(actualList, hasItems("ｱｲｳｴｵｶｷｸｹｺ","ｻｼｽｾｿﾀﾁﾂﾃﾄ","ﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎ","ﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘ"));
+    }
+
+
 }

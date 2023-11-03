@@ -1,15 +1,21 @@
 package nablarch.fw.reader;
 
-import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import nablarch.core.db.connection.AppDbConnection;
 import nablarch.core.db.connection.ConnectionFactory;
@@ -25,6 +31,7 @@ import nablarch.core.transaction.TransactionContext;
 import nablarch.core.transaction.TransactionFactory;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
+import nablarch.fw.SynchronizedDataReaderWrapper;
 import nablarch.test.support.SystemRepositoryResource;
 import nablarch.test.support.db.helper.DatabaseTestRunner;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
@@ -329,5 +336,45 @@ public class DatabaseRecordReaderTest {
         assertThat(reader.read(null).getString("publisher"), is("change"));
         assertThat(reader.read(null).getString("publisher"), is("change"));
         assertThat(reader.read(null), is(nullValue()));
+    }
+
+    @Test
+    public void synchronizedでラップした場合_スレッドセーフな挙動となっていること() throws Exception {
+        // 0件のパターン
+        VariousDbTestHelper.delete(ReaderBook.class);
+        SqlPStatement statement = DbConnectionContext.getConnection()
+                .prepareStatementBySqlId(DatabaseRecordReaderTest.class.getName() + "#SQL_001");
+
+
+        // 3件のパターン
+        VariousDbTestHelper.setUpTable(
+                new ReaderBook("Learning the vi and vim Editors", "OReilly", "Robbins Hanneah and Lamb"),
+                new ReaderBook("Patterns of Enterprise Application Architecture", "Addison-Wesley", "Martin Fowler"),
+                new ReaderBook("Programming with POSIX Threads", "Addison-Wesley", "David R. Butenhof"));
+
+        DataReader<SqlRow> sut = new DatabaseRecordReader().setStatement(statement);
+
+        SynchronizedDataReaderWrapper<SqlRow> testReader = new SynchronizedDataReaderWrapper<>(sut);
+
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+
+        List<DataReadTask<SqlRow>> tasks = new ArrayList<>(3);
+        DataReadTask<SqlRow> task = new DataReadTask<>(testReader);
+        for (int i = 0; i < 3; i++) {
+            tasks.add(task);
+        }
+
+        List<Future<SqlRow>> result = executor.invokeAll(tasks);
+
+        List<String> actualTitleList = new ArrayList<>();
+        for (Future<SqlRow> future : result) {
+            actualTitleList.add((String) future.get().get("title"));
+        }
+
+        assertThat(actualTitleList, hasItems(
+                "Learning the vi and vim Editors",
+                "Patterns of Enterprise Application Architecture",
+                "Programming with POSIX Threads"));
+
     }
 }
