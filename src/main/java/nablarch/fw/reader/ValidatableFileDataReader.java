@@ -87,7 +87,7 @@ public class ValidatableFileDataReader extends FileDataReader {
      * @return １レコード分のデータレコード
      */
     @Override
-    public synchronized DataRecord read(ExecutionContext ctx) {
+    public DataRecord read(ExecutionContext ctx) {
         if (!validated) {
             validate(ctx);
         }
@@ -109,12 +109,9 @@ public class ValidatableFileDataReader extends FileDataReader {
      * @return 次に読み込むデータが存在する場合は {@code true}
      */
     @Override
-    public synchronized boolean hasNext(ExecutionContext ctx) {
+    public boolean hasNext(ExecutionContext ctx) {
         if (validated && useCache) {
-            synchronized (this) {
-                return (recordCache == null) ? false
-                                             : !recordCache.isEmpty();
-            }
+            return recordCache != null && !recordCache.isEmpty();
         }
         return super.hasNext(ctx);
     }
@@ -127,7 +124,7 @@ public class ValidatableFileDataReader extends FileDataReader {
      * @param ctx 実行コンテキスト
      */
     @Override
-    public synchronized void close(ExecutionContext ctx) {
+    public void close(ExecutionContext ctx) {
         if (useCache) {
             recordCache.clear();
             recordCache = null;
@@ -220,7 +217,7 @@ public class ValidatableFileDataReader extends FileDataReader {
      * @return このオブジェクト自体
      */
     @Published(tag = "architect")
-    public synchronized ValidatableFileDataReader setUseCache(boolean useCache) {
+    public ValidatableFileDataReader setUseCache(boolean useCache) {
         this.useCache = useCache;
         return this;
     }

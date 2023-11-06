@@ -1,6 +1,8 @@
 package nablarch.fw.reader;
 
+import nablarch.common.databind.ObjectMapperFactory;
 import nablarch.fw.ExecutionContext;
+import nablarch.fw.SynchronizedDataReaderWrapper;
 import nablarch.fw.TestSupport;
 import nablarch.test.support.SystemRepositoryResource;
 import org.junit.After;
@@ -9,12 +11,21 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.hamcrest.CoreMatchers.allOf;
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasProperty;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -252,5 +263,43 @@ public class DataBindRecordReaderTest {
         sut = new DataBindRecordReader<>(DataBindTestForm.class)
                 .setDataFile("record")
                 .setBufferSize(0);
+    }
+
+    @Test
+    public void synchronizedでラップした場合_スレッドセーフな挙動となっていること() throws Exception {
+
+        TestSupport.createFile(dataFile, "\r\n", StandardCharsets.UTF_8,
+                "年齢,氏名",
+                "20,山田太郎",
+                "30,鈴木次郎",
+                "40,佐藤花子",
+                "50,田中一郎"
+        );
+
+        // synchronizedでラップしたデータリーダの作成
+        sut = new DataBindRecordReader<>(DataBindTestForm.class);
+        sut.setObjectMapperIterator(new SleepingObjectMapperIterator<>(
+                ObjectMapperFactory.create(DataBindTestForm.class, new FileInputStream(dataFile)),
+                500));
+        SynchronizedDataReaderWrapper<DataBindTestForm> testReader = new SynchronizedDataReaderWrapper<>(sut);
+
+        // 並列実行するタスクを作成
+        List<DataReadTask<DataBindTestForm>> tasks = new ArrayList<>(4);
+        DataReadTask<DataBindTestForm> task = new DataReadTask<>(testReader, new CountDownLatch(4), new ExecutionContext());
+        for (int i = 0; i < 4; i++) {
+            tasks.add(task);
+        }
+
+        // 並列実行し、結果を取得
+        // DataReadTaskのラッチ機構で各スレッドのread()呼出タイミングを同期し、更にread()内で一定時間待つことで実行タイミングを重複させる。
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+        List<Future<DataBindTestForm>> result = executor.invokeAll(tasks);
+
+        List<String> actualList = new ArrayList<>();
+        for (Future<DataBindTestForm> future : result) {
+            actualList.add(future.get().getName());
+        }
+
+        assertThat(actualList, hasItems("山田太郎","鈴木次郎","佐藤花子","田中一郎"));
     }
 }

@@ -1,5 +1,7 @@
 package nablarch.fw.reader;
 
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -11,21 +13,25 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import nablarch.core.ThreadContext;
 import nablarch.core.dataformat.DataRecord;
 import nablarch.core.dataformat.FormatterFactory;
 import nablarch.core.dataformat.InvalidDataFormatException;
-import nablarch.core.repository.SystemRepository;
-import nablarch.core.util.FilePathSetting;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
 import nablarch.fw.Handler;
 import nablarch.fw.Result;
+import nablarch.fw.SynchronizedDataReaderWrapper;
 import nablarch.fw.TestSupport;
 import nablarch.fw.handler.RecordTypeBinding;
 import nablarch.test.support.SystemRepositoryResource;
@@ -36,6 +42,7 @@ import org.junit.Rule;
 import org.junit.Test;
 
 
+@SuppressWarnings("NonAsciiCharacters")
 public class ValidatableFileDataReaderTest {
 
     @Rule
@@ -49,7 +56,7 @@ public class ValidatableFileDataReaderTest {
         ThreadContext.clear();
         // データフォーマット定義ファイル
         File formatFile = new File(tempDir, "format.fmt");
-        TestSupport.createFile(formatFile, Charset.forName("UTF-8"),
+        TestSupport.createFile(formatFile, StandardCharsets.UTF_8,
                 "file-type:    \"Fixed\"",
                 "text-encoding: \"sjis\"",
                 "record-length: 10",
@@ -93,7 +100,7 @@ public class ValidatableFileDataReaderTest {
     }
 
     public void _testValidate(boolean useCache) throws Exception {
-        final List<String> activities = new ArrayList<String>();
+        final List<String> activities = new ArrayList<>();
         class TestValidator implements ValidatableFileDataReader.FileValidatorAction {
 
             private int totalAmount = 0;
@@ -265,7 +272,7 @@ public class ValidatableFileDataReaderTest {
     /** ValidaterがHandlerの場合のテスト。 */
     @Test
     public void testValidateHandler() throws Exception {
-        final List<String> activities = new ArrayList<String>();
+        final List<String> activities = new ArrayList<>();
         class TestValidatorHandler implements ValidatableFileDataReader.FileValidatorAction, Handler<Object, Object> {
 
             public int handleCount = 0;
@@ -359,10 +366,10 @@ public class ValidatableFileDataReaderTest {
     /** メソッドバインディングを設定しない場合のテスト。 */
     @Test
     public void testInvalidBinding() throws Exception {
-        final List<String> activities = new ArrayList<String>();
+        final List<String> activities = new ArrayList<>();
         class TestValidatorHandler implements ValidatableFileDataReader.FileValidatorAction {
 
-            public boolean isHandle = false;
+            public final boolean isHandle = false;
 
             public void onFileEnd(ExecutionContext ctx) {
                 activities.add("onFileEnd");
@@ -411,7 +418,7 @@ public class ValidatableFileDataReaderTest {
     @Test
     public void testClose() throws Exception {
 
-        final List<String> activities = new ArrayList<String>();
+        final List<String> activities = new ArrayList<>();
         class TestValidator implements ValidatableFileDataReader.FileValidatorAction {
 
             private int totalAmount = 0;
@@ -552,5 +559,66 @@ public class ValidatableFileDataReaderTest {
             assertTrue(true);
         }
 
+    }
+
+    @Test
+    public void synchronizedでラップした場合_スレッドセーフな挙動となっていること() throws Exception {
+        // データフォーマット定義ファイル
+        File formatFile = new File(tempDir, "format2.fmt");
+        TestSupport.createFile(formatFile, StandardCharsets.UTF_8,
+                "file-type:    \"Fixed\"",
+                "text-encoding: \"sjis\"",
+                "record-length: 10",
+                "",
+                "[Default]",
+                "1  byteString X(10)"
+        );
+
+        // バリデーション用アクション
+        class MockValidator implements ValidatableFileDataReader.FileValidatorAction {
+            public Result doDefault(DataRecord record, ExecutionContext ctx) {
+                return new Result.Success();
+            }
+
+            public void onFileEnd(ExecutionContext ctx) {
+                // nop
+            }
+        }
+
+        File dataFile = new File(tempDir, "record.dat");
+        OutputStream dest = new FileOutputStream(dataFile, false);
+        dest.write("ｱｲｳｴｵｶｷｸｹｺ".getBytes("sjis"));
+        dest.write("ｻｼｽｾｿﾀﾁﾂﾃﾄ".getBytes("sjis"));
+        dest.write("ﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎ".getBytes("sjis"));
+        dest.write("ﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘ".getBytes("sjis"));
+        dest.close();
+
+        // synchronizedでラップしたデータリーダの作成
+        DataReader<DataRecord> sut = new ValidatableFileDataReader()
+                .setValidatorAction(new MockValidator())
+                .setDataFile("record")
+                .setLayoutFile("format2");
+        ((ValidatableFileDataReader) sut).setFileReader(new SleepingFileRecordReader(dataFile, formatFile, 8192, 500));
+        SynchronizedDataReaderWrapper<DataRecord> testReader = new SynchronizedDataReaderWrapper<>(sut);
+
+        // 並列実行するタスクを作成
+        List<DataReadTask<DataRecord>> tasks = new ArrayList<>(4);
+        ExecutionContext ctx = new ExecutionContext().setMethodBinder(new RecordTypeBinding.Binder());
+        DataReadTask<DataRecord> task = new DataReadTask<>(testReader, new CountDownLatch(4), ctx);
+        for (int i = 0; i < 4; i++) {
+            tasks.add(task);
+        }
+
+        // 並列実行し、結果を取得
+        // DataReadTaskのラッチ機構で各スレッドのread()呼出タイミングを同期し、更にread()内で一定時間待つことで実行タイミングを重複させる。
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+        List<Future<DataRecord>> result = executor.invokeAll(tasks);
+
+        List<String> actualList = new ArrayList<>();
+        for (Future<DataRecord> future : result) {
+            actualList.add((String) future.get().get("byteString"));
+        }
+
+        assertThat(actualList, hasItems("ｱｲｳｴｵｶｷｸｹｺ","ｻｼｽｾｿﾀﾁﾂﾃﾄ","ﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎ","ﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘ"));
     }
 }
