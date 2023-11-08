@@ -1,57 +1,49 @@
 package nablarch.fw.reader;
 
-import java.util.LinkedList;
-import java.util.List;
-
-import nablarch.core.dataformat.DataRecord;
 import nablarch.core.log.Logger;
 import nablarch.core.log.LoggerManager;
 import nablarch.core.util.annotation.Published;
-import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
 import nablarch.fw.Handler;
-import nablarch.fw.MethodBinder;
+
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * ファイル内容のバリデーション機能を追加したデータリーダ。
- * <p/>
- * ファイル全件の読み込みを行い、このリーダが提供する{@link FileValidatorAction}に実装されたバリデーションロジックを
- * {@link #setValidatorAction(FileValidatorAction)}から設定することができる。
- * バリデーションが正常終了した場合は、入力ファイルを開きなおして本処理を行う。<br/>
+ * <p>
+ * ファイル全件の読み込みを行い、このリーダが提供する{@link DataBindFileValidatorAction}に実装されたバリデーションロジックを
+ * {@link #setValidatorAction(DataBindFileValidatorAction)}から設定することができる。
+ * バリデーションが正常終了した場合は、入力ファイルを開きなおして本処理を行う。
  * また、{@link #setUseCache(boolean)}に{@code true}を設定することで、バリデーション時に読み込んだデータを
- * メモリ上にキャッシュし、都度2回の読み込みを1回に削減することができる。<br/>
- * ただし、データ量によってはメモリリソースを大幅に消費する点に注意すること。<br/>
+ * メモリ上にキャッシュし、都度2回の読み込みを1回に削減することができる。
+ * ただし、データ量によってはメモリリソースを大幅に消費する点に注意すること。
+ * <p>
+ * バリデーションが失敗した場合、このデータリーダは例外を送出してクローズされる。
  *
- * @author Iwauo Tajima
+ *
+ * @author Takayuki Uchida
  */
-public class ValidatableFileDataReader extends FileDataReader {
+public class ValidatableDataBindRecordReader<T> extends DataBindRecordReader<T>{
 
     /** ロガー */
-    private static final Logger LOGGER = LoggerManager.get(ValidatableFileDataReader.class);
+    private static final Logger LOGGER = LoggerManager.get(ValidatableDataBindRecordReader.class);
 
     /**
-     * {@code ValidatableFileDataReader}オブジェクトを生成する。
+     * コンストラクタ。
+     *
+     * @param inputDataType 入力データの型
      */
     @Published(tag = "architect")
-    public ValidatableFileDataReader() {
+    public ValidatableDataBindRecordReader(Class<T> inputDataType) {
+        super(inputDataType);
     }
-
-// ----------------------------------------------------- Validator
 
     /**
      * バリデーションを行うオブジェクトが実装するインタフェース。
-     * <p/>
-     * このインタフェースに定義されたメソッドの他に、
-     * 以下のシグニチャを持ったメソッドをレコードタイプ毎に定義する必要がある。<br/>
-     * このメソッドには、対象のレコードタイプに合わせたバリデーションロジックを実装する。
-     * {@code
-     *   public Result "do" + [レコードタイプ名](DataRecord record, ExecutionContext ctx);
-     * }
-     *
-     * @see nablarch.fw.handler.RecordTypeBinding
      */
     @Published
-    public static interface FileValidatorAction {
+    public interface DataBindFileValidatorAction<T> extends Handler<T, Object> {
         /**
          * ファイル全件の読み込みが正常終了し、
          * ファイル終端に達するとコールバックされる
@@ -59,21 +51,19 @@ public class ValidatableFileDataReader extends FileDataReader {
          */
         void onFileEnd(ExecutionContext ctx);
     }
-    
-    // ----------------------------------------------------- structure
+
     /** バリデーションを実装したハンドラ */
-    private FileValidatorAction validatorAction = null;
-    
+    private DataBindFileValidatorAction<T> validatorAction = null;
+
     /** バリデーション時に読み込んだデータを本処理で使用するかどうか。 */
     private boolean useCache = false;
-    
+
     /** バリデーションで読み込んだデータを格納するキャッシュ */
-    private List<DataRecord> recordCache = null;
-    
+    private List<T> recordCache = null;
+
     /** バリデーション済みフラグ */
     private boolean validated = false;
-    
-    // ----------------------------------------------------- DataReader I/F
+
     /**
      * データファイルを1レコードづつ読み込む。
      * <p/>
@@ -87,14 +77,14 @@ public class ValidatableFileDataReader extends FileDataReader {
      * @return １レコード分のデータレコード
      */
     @Override
-    public DataRecord read(ExecutionContext ctx) {
+    public T read(ExecutionContext ctx) {
         if (!validated) {
             validate(ctx);
         }
         if (useCache) {
             return (recordCache == null || recordCache.isEmpty())
-                  ? null
-                  : recordCache.remove(0);
+                    ? null
+                    : recordCache.remove(0);
         }
         return super.read(ctx);
     }
@@ -126,51 +116,39 @@ public class ValidatableFileDataReader extends FileDataReader {
     @Override
     public void close(ExecutionContext ctx) {
         if (useCache) {
-            recordCache.clear();
+            if(recordCache != null) {
+                recordCache.clear();
+            }
             recordCache = null;
         }
         super.close(ctx);
     }
-    
-    // ------------------------------------------------------ main routine
+
+
     /**
      * バリデーションを行う。
-     * <p/>
-     * キャッシュを有効にしている場合、読み込んだデータをキャッシュする。<br/>
-     * 無効にしている場合、入力ファイルの再読み込みを行うため、{@link FileDataReader}を初期化する。
+     * <p>
+     * {@link ValidatableDataBindRecordReader#useCache}が{@code true}である場合、読み込んだデータをキャッシュする。
      *
      * @param ctx 実行コンテキスト
      * @throws IllegalStateException バリデーション処理を実装したオブジェクトが{@code null}の場合
      * @throws RuntimeException 実行時例外が発生した場合
      * @throws Error エラーが発生した場合
      */
-    @SuppressWarnings({ "rawtypes", "unchecked" })
     protected void validate(ExecutionContext ctx) {
         if (validatorAction == null) {
             throw new IllegalStateException(
-                "FileValidatorAction was not set. an Object that implements the validation logic must be set."
+                    "FileValidatorAction was not set. an Object that implements the validation logic must be set."
             );
         }
         try {
-            Handler validateHandler;
-            if (validatorAction instanceof Handler) {
-                validateHandler = (Handler) validatorAction;
-            } else {
-                MethodBinder<DataReader, ?> binding = ctx.getMethodBinder();
-                if (binding == null) {
-                    throw new RuntimeException(
-                        "MethodBinder was not found. you must set a MethodBinder to the ExecutionHandler "
-                      + "or make validator object implement Handler."
-                    );
-                }
-                validateHandler = binding.bind(validatorAction);
-            }
-            
+            Handler<T, Object> validateHandler = validatorAction;
+
             if (useCache) {
-                recordCache = new LinkedList<DataRecord>();
+                recordCache = new LinkedList<>();
             }
             while (super.hasNext(ctx)) {
-                DataRecord record = super.read(ctx);
+                T record = super.read(ctx);
                 validateHandler.handle(record, ctx);
                 if (useCache) {
                     recordCache.add(record);
@@ -181,14 +159,7 @@ public class ValidatableFileDataReader extends FileDataReader {
             if (!useCache) {
                 initialize();
             }
-        } catch (RuntimeException e) {
-            try {
-                close(ctx);
-            } catch (Throwable t) {
-                LOGGER.logWarn("failed to release file resource.", t);
-            }
-            throw e;
-        } catch (Error e) {
+        } catch (RuntimeException | Error e) {
             try {
                 close(ctx);
             } catch (Throwable t) {
@@ -199,17 +170,14 @@ public class ValidatableFileDataReader extends FileDataReader {
             validated = true;
         }
     }
-    
+
     /**
-     * キャッシュを使用しない場合、ファイルリーダを初期化する。
+     * データリーダを初期化し、再度使用できるようにする。
      */
     protected void initialize() {
-        getFileReader().close();
-        setFileReader(null);
+        super.setObjectMapperIterator(null);
     }
 
-
-    // ----------------------------------------------------- settings
     /**
      * バリデーション時に読み込んだデータをキャッシュし、本処理で使用するかどうかを設定する。
      *
@@ -217,11 +185,11 @@ public class ValidatableFileDataReader extends FileDataReader {
      * @return このオブジェクト自体
      */
     @Published(tag = "architect")
-    public ValidatableFileDataReader setUseCache(boolean useCache) {
+    public ValidatableDataBindRecordReader<T> setUseCache(boolean useCache) {
         this.useCache = useCache;
         return this;
     }
-    
+
     /**
      * バリデーション処理を実装したアクションクラスを設定する。
      *
@@ -230,12 +198,61 @@ public class ValidatableFileDataReader extends FileDataReader {
      * @throws IllegalArgumentException バリデーションを実装したアクションクラスが{@code null}の場合
      */
     @Published(tag = "architect")
-    public ValidatableFileDataReader setValidatorAction(
-            FileValidatorAction validatorAction) {
+    public ValidatableDataBindRecordReader<T> setValidatorAction(DataBindFileValidatorAction<T> validatorAction) {
         if (validatorAction == null) {
             throw new IllegalArgumentException("validator action was null. validator action must not be null.");
         }
         this.validatorAction = validatorAction;
         return this;
     }
+
+    /**
+     * データファイルのファイル名を設定する。
+     * <p/>
+     * "input"という論理名のベースパス配下に存在する当該ファイルがデータファイルとして使用される。
+     *
+     * @param fileName データファイル名
+     * @return このオブジェクト自体
+     */
+    @Published(tag = "architect")
+    public ValidatableDataBindRecordReader<T> setDataFile(String fileName) {
+        return (ValidatableDataBindRecordReader<T>) super.setDataFile(fileName);
+    }
+
+    /**
+     * データファイルのベースパス論理名およびファイル名を設定する。
+     * <p/>
+     * 設定したベースパス配下に存在する当該のファイルがデータファイルとして使用される。
+     *
+     * @param basePathName ベースパス論理名
+     * @param fileName データファイル名
+     * @return このオブジェクト自体
+     */
+    @Published(tag = "architect")
+    public ValidatableDataBindRecordReader<T> setDataFile(String basePathName, String fileName) {
+        return (ValidatableDataBindRecordReader<T>) super.setDataFile(basePathName, fileName);
+    }
+
+    /**
+     * ファイル読み込み時にバッファーを使用するか否かを設定する。
+     *
+     * @param useBuffer バッファーを使用する場合は {@code true}
+     * @return このオブジェクト自体
+     */
+    @Published(tag = "architect")
+    public ValidatableDataBindRecordReader<T> setUseBuffer(boolean useBuffer) {
+        return (ValidatableDataBindRecordReader<T>) super.setUseBuffer(useBuffer);
+    }
+
+    /**
+     * ファイル読み込み時のバッファーサイズを設定する。
+     *
+     * @param bufferSize バッファーサイズ
+     * @return このオブジェクト自体
+     */
+    @Published(tag = "architect")
+    public ValidatableDataBindRecordReader<T> setBufferSize(int bufferSize) {
+        return (ValidatableDataBindRecordReader<T>) super.setBufferSize(bufferSize);
+    }
+
 }

@@ -49,7 +49,7 @@ public class ResumeDataReader<TData> implements DataReader<TData> {
      * @return 入力データオブジェクト
      */
     @Override
-    public synchronized TData read(ExecutionContext ctx) {
+    public TData read(ExecutionContext ctx) {
         if (!sourceReader.hasNext(ctx)) {
             return null;
         }
@@ -72,7 +72,7 @@ public class ResumeDataReader<TData> implements DataReader<TData> {
      * @return 次に読み込むデータが存在する場合は{@code true}
      */
     @Override
-    public synchronized boolean hasNext(ExecutionContext ctx) {
+    public boolean hasNext(ExecutionContext ctx) {
         return sourceReader.hasNext(ctx);
     }
 
@@ -82,7 +82,7 @@ public class ResumeDataReader<TData> implements DataReader<TData> {
      * @param ctx 実行コンテキスト
      */
     @Override
-    public synchronized void close(ExecutionContext ctx) {
+    public void close(ExecutionContext ctx) {
         sourceReader.close(ctx);
     }
 
@@ -157,7 +157,7 @@ public class ResumeDataReader<TData> implements DataReader<TData> {
      * @param sourceReader レジューム機能を追加するデータリーダ
      * @return このオブジェクト自体
      */
-    public synchronized ResumeDataReader<TData> setSourceReader(DataReader<TData> sourceReader) {
+    public ResumeDataReader<TData> setSourceReader(DataReader<TData> sourceReader) {
         this.sourceReader = sourceReader;
         return this;
     }

@@ -66,7 +66,7 @@ public class FileDataReader implements DataReader<DataRecord> {
      * @param ctx 実行コンテキスト
      * @return 1レコード分のデータレコード（読み込むデータがなかった場合は{@code null}）
      */
-    public synchronized DataRecord read(ExecutionContext ctx) {
+    public DataRecord read(ExecutionContext ctx) {
         if (fileReader == null) {
             fileReader = createFileRecordReader();
         }
@@ -84,7 +84,7 @@ public class FileDataReader implements DataReader<DataRecord> {
      * @param ctx 実行コンテキスト
      * @return 読み込むデータが存在する場合は {@code true}
      */
-    public synchronized boolean hasNext(ExecutionContext ctx) {
+    public boolean hasNext(ExecutionContext ctx) {
         if (fileReader == null) {
             fileReader = createFileRecordReader();
         }
@@ -98,7 +98,7 @@ public class FileDataReader implements DataReader<DataRecord> {
      * <p/>
      * このリーダが既に閉じられている場合は何もしない。
      */ 
-    public synchronized void close(ExecutionContext ctx) {
+    public void close(ExecutionContext ctx) {
         if (fileReader == null) {
             return;
         }
@@ -211,7 +211,7 @@ public class FileDataReader implements DataReader<DataRecord> {
      * {@code FileRecordReader}オブジェクトを取得する。
      * @return FileRecordReaderオブジェクト（FileRecordReaderオブジェクトが生成されていない場合は{@code null}）
      */
-    protected synchronized FileRecordReader getFileReader() {
+    protected FileRecordReader getFileReader() {
         return fileReader;
     }
 
@@ -219,7 +219,8 @@ public class FileDataReader implements DataReader<DataRecord> {
      * {@code FileRecordReader}オブジェクトを設定する。
      * @param fileReader {@code FileRecordReader}オブジェクト
      */
-    protected synchronized void setFileReader(FileRecordReader fileReader) {
+
+    protected void setFileReader(FileRecordReader fileReader) {
         this.fileReader = fileReader;
     }
     

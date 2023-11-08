@@ -1,13 +1,19 @@
 package nablarch.fw.reader;
 
-import static org.hamcrest.CoreMatchers.*;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.fail;
 
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -18,6 +24,7 @@ import nablarch.core.db.statement.SqlPStatement;
 import nablarch.core.db.statement.SqlRow;
 import nablarch.core.db.statement.exception.SqlStatementException;
 import nablarch.core.transaction.TransactionContext;
+import nablarch.fw.SynchronizedDataReaderWrapper;
 import nablarch.test.support.SystemRepositoryResource;
 import nablarch.test.support.db.helper.DatabaseTestRunner;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
@@ -39,7 +46,7 @@ public class DatabaseTableQueueReaderTest {
     @Rule
     public SystemRepositoryResource repositoryResource = new SystemRepositoryResource("db-default.xml");
 
-    private static TransactionManagerConnection connection;
+    private TransactionManagerConnection connection;
 
     @BeforeClass
     public static void setUpClass() throws Exception {
@@ -146,7 +153,7 @@ public class DatabaseTableQueueReaderTest {
 
         // 別スレッドでデータをリード
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<SqlRow> future = executor.submit(new DataReadTask(sut));
+        Future<SqlRow> future = executor.submit(new DataReadTask<>(sut, new CountDownLatch(1), null));
         executor.shutdown();
         SqlRow row = future.get();
         assertThat("子スレッド側でデータが読み込めていること", row.getBigDecimal("id")
@@ -169,18 +176,18 @@ public class DatabaseTableQueueReaderTest {
 
         // 別スレッドでデータをリード
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<SqlRow> future = executor.submit(new DataReadTask(sut));
+        Future<SqlRow> future = executor.submit(new DataReadTask<>(sut, new CountDownLatch(1), null));
         assertThat("子スレッド側でデータが読み込めること", future.get()
                                                .getBigDecimal("id")
                                                .intValue(), is(1));
 
-        future = executor.submit(new DataReadTask(sut));
+        future = executor.submit(new DataReadTask<>(sut, new CountDownLatch(1), null));
         assertThat("子スレッドで再度リードした場合同じレコードが読み込めること", future.get()
                                                           .getBigDecimal("id")
                                                           .intValue(), is(1));
 
         updateStatus();
-        future = executor.submit(new DataReadTask(sut));
+        future = executor.submit(new DataReadTask<>(sut, new CountDownLatch(1), null));
         assertThat("処理済みになった場合は読み取れない", future.get(), is(nullValue()));
         executor.shutdown();
     }
@@ -192,16 +199,25 @@ public class DatabaseTableQueueReaderTest {
     public void multiThreadRead() throws Exception {
         createTestData(5);
 
+        // synchronizedでラップしたデータリーダの作成
+        // 複数スレッドでDataReader#read()の呼出タイミングを重複させて問題なく動作することを確認したいが、
+        // DatabaseRecordReaderでは、DataReader#read()の呼出タイミングを重複させることができない。
+        // そのため、DataReadTaskのラッチ機構で各スレッドのDataReader#read()呼出タイミングを同期させ、擬似的にread()の実行を重複させている。
         final DatabaseTableQueueReader sut = createReader();
-        ExecutorService executor = Executors.newFixedThreadPool(5);
+        SynchronizedDataReaderWrapper<SqlRow> testReader = new SynchronizedDataReaderWrapper<>(sut);
 
-        List<Future<SqlRow>> result = new ArrayList<Future<SqlRow>>(5);
-        DataReadTask task = new DataReadTask(sut);
+        // 並列実行するタスクを作成
+        List<DataReadTask<SqlRow>> tasks = new ArrayList<>(5);
+        DataReadTask<SqlRow> task = new DataReadTask<>(testReader, new CountDownLatch(5), null);
         for (int i = 0; i < 5; i++) {
-            result.add(executor.submit(task));
+            tasks.add(task);
         }
 
-        List<Integer> actualList = new ArrayList<Integer>();
+        // 並列実行し、結果を取得
+        ExecutorService executor = Executors.newFixedThreadPool(5);
+        List<Future<SqlRow>> result = executor.invokeAll(tasks);
+
+        List<Integer> actualList = new ArrayList<>();
         for (Future<SqlRow> future : result) {
             actualList.add(future.get()
                                  .getBigDecimal("id")
@@ -215,7 +231,7 @@ public class DatabaseTableQueueReaderTest {
     /**
      * 主キーカラムが複数の場合のテスト。
      *
-     * @throws Exception
+     * @throws Exception Exception
      */
     @Test
     public void multiplePrimaryKeys() throws Exception {
@@ -245,10 +261,11 @@ public class DatabaseTableQueueReaderTest {
         DatabaseRecordReader reader = new DatabaseRecordReader();
         reader.setStatement(connection.prepareStatement("SELECT * FROM MULTI_PRIMARY_KEY ORDER BY ID"));
         final DatabaseTableQueueReader sut = new DatabaseTableQueueReader(reader, 1000, "id1", "id2");
+        final SynchronizedDataReaderWrapper<SqlRow> testReader = new SynchronizedDataReaderWrapper<>(sut);
 
         ExecutorService executor = Executors.newFixedThreadPool(4);
-        Callable<SqlRow> task = new DataReadTask(sut);
-        List<Future<SqlRow>> result = new ArrayList<Future<SqlRow>>();
+        Callable<SqlRow> task = new DataReadTask<>(testReader, new CountDownLatch(0), null);
+        List<Future<SqlRow>> result = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
             result.add(executor.submit(task));
         }
@@ -266,7 +283,7 @@ public class DatabaseTableQueueReaderTest {
     /**
      * INFOログ読み込んだレコードの主キー情報が出力されていることを確認する。
      *
-     * @throws Exception
+     * @throws Exception Exception
      */
     @Test
     public void writeInfoLog() throws Exception {
@@ -325,7 +342,7 @@ public class DatabaseTableQueueReaderTest {
     /**
      * 待機時間分待機後にデータが取得できること
      *
-     * @throws Exception
+     * @throws Exception Exception
      */
     @Test
     public void waitTime() throws Exception {
@@ -363,7 +380,7 @@ public class DatabaseTableQueueReaderTest {
     /**
      * クローズ後にデータを読み取ろうとした場合例外が発生すること
      *
-     * @throws Exception
+     * @throws Exception Exception
      */
     @Test
     public void close() throws Exception {
@@ -385,7 +402,7 @@ public class DatabaseTableQueueReaderTest {
     /**
      * 指定したプライマリーキーが要求に存在しない場合例外が発生すること。
      *
-     * @throws Exception
+     * @throws Exception Exception
      */
     @Test
     public void pkWasNotFound() throws Exception {
@@ -407,7 +424,7 @@ public class DatabaseTableQueueReaderTest {
     /**
      * プライマリーキーにnullを指定した場合例外が発生すること
      *
-     * @throws Exception
+     * @throws Exception Exception
      */
     @Test
     public void specifiedPrimaryKeyNull() throws Exception {
@@ -482,7 +499,7 @@ public class DatabaseTableQueueReaderTest {
      *
      * @param dataCount 作成レコード数
      */
-    private static void createTestData(int dataCount) {
+    private void createTestData(int dataCount) {
         createTestData(1, dataCount);
     }
 
@@ -491,7 +508,7 @@ public class DatabaseTableQueueReaderTest {
      *
      * @param dataCount 作成レコード数
      */
-    private static void createTestData(int startCount, int dataCount) {
+    private void createTestData(int startCount, int dataCount) {
         SqlPStatement statement = connection.prepareStatement("INSERT INTO BATCH_REQUEST_TABLE VALUES (?, ?, ?)");
         for (int i = startCount; i <= (startCount + dataCount) - 1; i++) {
             statement.setInt(1, i);
@@ -507,27 +524,10 @@ public class DatabaseTableQueueReaderTest {
     /**
      * 要求データのステータスを全て処理済みに更新する。
      */
-    private static void updateStatus() {
+    private void updateStatus() {
         SqlPStatement statement = connection.prepareStatement("UPDATE BATCH_REQUEST_TABLE SET STATUS = '1'");
         statement.executeUpdate();
         connection.commit();
-    }
-
-    /**
-     * リーダからデータをリードし、リードした値を返却するタスク。
-     */
-    private static class DataReadTask implements Callable<SqlRow> {
-
-        private final DatabaseTableQueueReader reader;
-
-        public DataReadTask(DatabaseTableQueueReader reader) {
-            this.reader = reader;
-        }
-
-        @Override
-        public SqlRow call() throws Exception {
-            return reader.read(null);
-        }
     }
 }
 
