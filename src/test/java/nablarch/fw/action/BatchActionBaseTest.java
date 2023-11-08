@@ -9,13 +9,11 @@ import java.util.Map;
 
 import nablarch.core.ThreadContext;
 import nablarch.core.dataformat.DataRecord;
-import nablarch.core.repository.SystemRepository;
 import nablarch.test.support.SystemRepositoryResource;
 import nablarch.test.support.log.app.OnMemoryLogWriter;
 import nablarch.test.support.message.MockStringResourceHolder;
 
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;

@@ -5,7 +5,6 @@ import nablarch.fw.ExecutionContext;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 /**
  * リーダからデータをリードし、リードした値を返却するタスク。
