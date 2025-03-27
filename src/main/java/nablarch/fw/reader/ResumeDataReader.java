@@ -19,6 +19,8 @@ import nablarch.fw.handler.LoopHandler;
  * なお、{@link nablarch.fw.action.FileBatchAction}を継承したバッチ業務アクションを作成する場合は、
  * {@code FileBatchAction}がデフォルトで{@link ValidatableFileDataReader}をラップした{@code ResumeDataReader}を生成するので、
  * アプリケーションプログラマが上記２つのオブジェクトを生成するコードを実装する必要はない。
+ * <p>
+ * また本クラスは内部的に{@link ResumePointManager}を使用するため、{@link ResumePointManager}の設定を行っておくこと。
  *
  * @param <TData> このクラスが読み込んだデータの型
  * @author Masato Inoue
