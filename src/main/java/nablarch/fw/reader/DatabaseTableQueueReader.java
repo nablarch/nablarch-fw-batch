@@ -90,7 +90,7 @@ public class DatabaseTableQueueReader implements DataReader<SqlRow> {
      * @return レコード
      */
     @Override
-    public synchronized SqlRow read(ExecutionContext ctx) {
+    public SqlRow read(ExecutionContext ctx) {
         if (!originalReader.hasNext(ctx)) {
             // データが存在しない場合は、待機時間分待機後にリソース(カーソル)を開き直す。
             waitThread();
@@ -137,7 +137,7 @@ public class DatabaseTableQueueReader implements DataReader<SqlRow> {
      * @return 読み込むデータが存在する場合 {@code true}
      */
     @Override
-    public synchronized boolean hasNext(ExecutionContext ctx) {
+    public boolean hasNext(ExecutionContext ctx) {
         return !closed;
     }
 
@@ -147,7 +147,7 @@ public class DatabaseTableQueueReader implements DataReader<SqlRow> {
      * @param ctx 実行コンテキスト
      */
     @Override
-    public synchronized void close(ExecutionContext ctx) {
+    public void close(ExecutionContext ctx) {
         closed = true;
         originalReader.close(ctx);
     }

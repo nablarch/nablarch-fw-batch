@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component-configuration xmlns="http://tis.co.jp/nablarch/component-configuration">
+
+  <!--データベース接続構成 -->
+  <import file="db-default.xml" />
+
+  <!-- 文字集合の設定 -->
+  <import file="nablarch/core/validation/charset-definition.xml"/>
+
+  <component name="filePathSetting" class="nablarch.core.util.FilePathSetting">
+    <property name="fileExtensions">
+      <map>
+        <entry key="input" value="dat" />
+      </map>
+    </property>
+    <property name="basePathSettings">
+      <map>
+        <entry key="input" value="file:${java.io.tmpdir}" />
+        <entry key="output" value="file:${java.io.tmpdir}" />
+      </map>
+    </property>
+  </component>
+
+  <!-- リクエストID抽出の実装 -->
+  <component name="requestIdExtractor" class="nablarch.common.util.ShortRequestIdExtractor" />
+
+  <!-- FileRecordReaderConfigの設定（レジューム機能を使用する） -->
+  <component name="resumePointManager"
+      class="nablarch.fw.reader.ResumePointManager">
+    <property name="tableName" value="BATCH_REQUEST" />
+    <property name="requestIdColumnName" value="REQUEST_ID" />
+    <property name="resumePointColumnName" value="RESUME_POINT" />
+    <property name="resumable" value="true" />
+  </component>
+
+  <!--初期化機能の設定 -->
+  <component name="initializer" class="nablarch.core.repository.initialization.BasicApplicationInitializer">
+    <property name="initializeList">
+      <list>
+        <component-ref name="resumePointManager" />
+      </list>
+    </property>
+  </component>
+
+
+  <!-- ハンドラーキュー構成 -->
+  <list name="handlerQueue">
+
+    <!-- 終了コードマッピング -->
+    <component class="nablarch.fw.handler.StatusCodeConvertHandler" />
+
+    <!-- 共通エラーハンドラー -->
+    <component class="nablarch.fw.handler.GlobalErrorHandler" />
+
+    <!-- スレッドコンテキスト管理ハンドラ-->
+    <component class="nablarch.common.handler.threadcontext.ThreadContextHandler">
+      <property name="attributes">
+        <list>
+          <!-- ユーザID -->
+          <component class="nablarch.common.handler.threadcontext.UserIdAttribute">
+            <property name="sessionKey" value="user.id" />
+            <property name="anonymousId" value="9999999999" />
+          </component>
+          <!-- リクエストID -->
+          <component class="nablarch.common.handler.threadcontext.RequestIdAttribute" />
+          <!-- 言語 -->
+          <component class="nablarch.common.handler.threadcontext.LanguageAttribute">
+            <property name="defaultLanguage" value="ja" />
+          </component>
+          <!-- 実行時ID -->
+          <component class="nablarch.common.handler.threadcontext.ExecutionIdAttribute" />
+        </list>
+      </property>
+    </component>
+
+    <!-- データベース接続管理ハンドラ-->
+    <component
+        name="dbConnectionManagementHandler"
+        class="nablarch.common.handler.DbConnectionManagementHandler">
+    </component>
+
+    <!-- 業務アクションディスパッチハンドラ -->
+    <component class="nablarch.fw.handler.RequestPathJavaPackageMapping">
+      <property name="basePackage" value="nablarch.fw.action" />
+      <property name="immediate" value="false" />
+    </component>
+
+    <!-- マルチスレッド実行制御ハンドラ -->
+    <component class="nablarch.fw.handler.MultiThreadExecutionHandler">
+      <property name="concurrentNumber" value="1" />
+      <property name="terminationTimeout" value="600" />
+    </component>
+
+    <!-- データベース接続管理ハンドラ-->
+    <component class="nablarch.common.handler.DbConnectionManagementHandler">
+    </component>
+
+    <!-- ループハンドラ -->
+    <component class="nablarch.fw.handler.LoopHandler">
+      <property name="commitInterval" value="3"/>
+    </component>
+
+    <!-- テスト用ハンドラ -->
+    <component class="nablarch.test.support.handler.CatchingHandler" />
+
+    <!-- データリードハンドラ -->
+    <component class="nablarch.fw.handler.DataReadHandler">
+    </component>
+
+  </list>
+  <!-- ハンドラーキュー構成(END) -->
+</component-configuration>

@@ -1,15 +1,22 @@
 package nablarch.fw.reader;
 
-import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import nablarch.core.db.connection.AppDbConnection;
 import nablarch.core.db.connection.ConnectionFactory;
@@ -25,6 +32,7 @@ import nablarch.core.transaction.TransactionContext;
 import nablarch.core.transaction.TransactionFactory;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
+import nablarch.fw.SynchronizedDataReaderWrapper;
 import nablarch.test.support.SystemRepositoryResource;
 import nablarch.test.support.db.helper.DatabaseTestRunner;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
@@ -41,13 +49,14 @@ import org.junit.runner.RunWith;
  *
  * @author Masato Inoue
  */
+@SuppressWarnings("NonAsciiCharacters")
 @RunWith(DatabaseTestRunner.class)
 public class DatabaseRecordReaderTest {
 
     @Rule
     public SystemRepositoryResource repositoryResource = new SystemRepositoryResource("db-default.xml");
 
-    private static TransactionManagerConnection tmConn;
+    private TransactionManagerConnection tmConn;
 
     /**
      * テーブル初期化処理。
@@ -263,6 +272,7 @@ public class DatabaseRecordReaderTest {
             reader.read(ctx);
             fail();
         } catch (IllegalStateException e) {
+            // nop
         }
     }
 
@@ -301,18 +311,15 @@ public class DatabaseRecordReaderTest {
         reader.setStatement(DbConnectionContext.getConnection().prepareStatement("SELECT * FROM READER_BOOK ORDER BY TITLE"));
 
         // レコードをキャッシュする前に、PUBLISHERカラムの値を全て"change"に変更するSQLを発行するリスナを追加
-        reader.setListener(new DatabaseRecordListener() {
-            @Override
-            public void beforeReadRecords() {
-                SimpleDbTransactionManager manager = SystemRepository.get("testTransaction");
-                new SimpleDbTransactionExecutor<Void>(manager) {
-                    @Override
-                    public Void execute(AppDbConnection appDbConnection) {
-                        appDbConnection.prepareStatement("UPDATE READER_BOOK SET PUBLISHER = 'change'").executeUpdate();
-                        return null;
-                    }
-                }.doTransaction();
-            }
+        reader.setListener(() -> {
+            SimpleDbTransactionManager manager1 = SystemRepository.get("testTransaction");
+            new SimpleDbTransactionExecutor<Void>(manager1) {
+                @Override
+                public Void execute(AppDbConnection appDbConnection) {
+                    appDbConnection.prepareStatement("UPDATE READER_BOOK SET PUBLISHER = 'change'").executeUpdate();
+                    return null;
+                }
+            }.doTransaction();
         });
 
         // カラムが全て更新されていること
@@ -329,5 +336,47 @@ public class DatabaseRecordReaderTest {
         assertThat(reader.read(null).getString("publisher"), is("change"));
         assertThat(reader.read(null).getString("publisher"), is("change"));
         assertThat(reader.read(null), is(nullValue()));
+    }
+
+    @Test
+    public void synchronizedでラップした場合_スレッドセーフな挙動となっていること() throws Exception {
+        VariousDbTestHelper.delete(ReaderBook.class);
+        SqlPStatement statement = DbConnectionContext.getConnection()
+                .prepareStatementBySqlId(DatabaseRecordReaderTest.class.getName() + "#SQL_001");
+
+        // 3件のパターン
+        VariousDbTestHelper.setUpTable(
+                new ReaderBook("Learning the vi and vim Editors", "OReilly", "Robbins Hanneah and Lamb"),
+                new ReaderBook("Patterns of Enterprise Application Architecture", "Addison-Wesley", "Martin Fowler"),
+                new ReaderBook("Programming with POSIX Threads", "Addison-Wesley", "David R. Butenhof"));
+
+        // synchronizedでラップしたデータリーダの作成
+        // 複数スレッドでDataReader#read()の呼出タイミングを重複させて問題なく動作することを確認したいが、
+        // DatabaseRecordReaderでは、DataReader#read()の呼出タイミングを重複させることができない。
+        // そのため、DataReadTaskのラッチ機構で各スレッドのDataReader#read()呼出タイミングを同期させ、擬似的にread()の実行を重複させている。
+        DataReader<SqlRow> sut = new DatabaseRecordReader().setStatement(statement);
+        SynchronizedDataReaderWrapper<SqlRow> testReader = new SynchronizedDataReaderWrapper<>(sut);
+
+        // 並列実行するタスクを作成
+        List<DataReadTask<SqlRow>> tasks = new ArrayList<>(3);
+        DataReadTask<SqlRow> task = new DataReadTask<>(testReader, new CountDownLatch(3), new ExecutionContext());
+        for (int i = 0; i < 3; i++) {
+            tasks.add(task);
+        }
+
+        // 並列実行し、結果を取得
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+        List<Future<SqlRow>> result = executor.invokeAll(tasks);
+
+        List<String> actualTitleList = new ArrayList<>();
+        for (Future<SqlRow> future : result) {
+            actualTitleList.add((String) future.get().get("title"));
+        }
+
+        assertThat(actualTitleList, hasItems(
+                "Learning the vi and vim Editors",
+                "Patterns of Enterprise Application Architecture",
+                "Programming with POSIX Threads"));
+
     }
 }

@@ -1,24 +1,31 @@
 package nablarch.fw.reader;
 
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import nablarch.core.ThreadContext;
 import nablarch.core.dataformat.DataRecord;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
+import nablarch.fw.SynchronizedDataReaderWrapper;
 import nablarch.fw.TestSupport;
 import nablarch.test.support.SystemRepositoryResource;
 
@@ -37,16 +44,18 @@ import org.junit.rules.ExpectedException;
  *
  * @author Masato Inoue
  */
+@SuppressWarnings("NonAsciiCharacters")
 public class FileDataReaderTest {
 
     @Rule
     public final SystemRepositoryResource resource = new SystemRepositoryResource(
             "nablarch/fw/reader/FileDataReaderTest.xml");
 
+    @SuppressWarnings("deprecation")
     @Rule
     public final ExpectedException expectedException = ExpectedException.none();
 
-    private File tempDir = new File(System.getProperty("java.io.tmpdir"));
+    private final File tempDir = new File(System.getProperty("java.io.tmpdir"));
 
     public FileDataReader sut = null;
 
@@ -58,7 +67,7 @@ public class FileDataReaderTest {
 
         // データフォーマット定義ファイル
         File formatFile = new File(tempDir, "format.fmt");
-        TestSupport.createFile(formatFile, Charset.forName("UTF-8"),
+        TestSupport.createFile(formatFile, StandardCharsets.UTF_8,
                 "file-type:    \"Fixed\"",
                 "text-encoding: \"sjis\"",
                 "record-length: 80",
@@ -163,7 +172,7 @@ public class FileDataReaderTest {
 
     /**
      * readメソッドの前にhasNextメソッドを実行するテスト
-     * {@lins testReadFrom}と結果は変わらない。
+     * {@link this#testReadFrom()}と結果は変わらない。
      */
     @Test
     public void testReadBeforeHasNext() throws Exception {
@@ -404,5 +413,51 @@ public class FileDataReaderTest {
         expectedException.expectMessage("invalid layout file path was specified. ");
         expectedException.expectMessage("notFound.fmt");
         dataReader.createFileRecordReader();
+    }
+
+    @Test
+    public void synchronizedでラップした場合_スレッドセーフな挙動となっていること() throws Exception {
+        // データフォーマット定義ファイル
+        File formatFile = new File(tempDir, "format2.fmt");
+        TestSupport.createFile(formatFile, StandardCharsets.UTF_8,
+                "file-type:    \"Fixed\"",
+                "text-encoding: \"sjis\"",
+                "record-length: 10",
+                "",
+                "[Default]",
+                "1  byteString X(10)"
+        );
+
+        File dataFile = new File(tempDir, "record.dat");
+        OutputStream dest = new FileOutputStream(dataFile, false);
+        dest.write("ｱｲｳｴｵｶｷｸｹｺ".getBytes("sjis"));
+        dest.write("ｻｼｽｾｿﾀﾁﾂﾃﾄ".getBytes("sjis"));
+        dest.write("ﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎ".getBytes("sjis"));
+        dest.write("ﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘ".getBytes("sjis"));
+        dest.close();
+
+        // synchronizedでラップしたデータリーダの作成
+        sut = new FileDataReader();
+        sut.setFileReader(new SleepingFileRecordReader(dataFile, formatFile, 8192, 500));
+        SynchronizedDataReaderWrapper<DataRecord> testReader = new SynchronizedDataReaderWrapper<>(sut);
+
+        // 並列実行するタスクを作成
+        List<DataReadTask<DataRecord>> tasks = new ArrayList<>(4);
+        DataReadTask<DataRecord> task = new DataReadTask<>(testReader, new CountDownLatch(4), new ExecutionContext());
+        for (int i = 0; i < 4; i++) {
+            tasks.add(task);
+        }
+
+        // 並列実行し、結果を取得
+        // DataReadTaskのラッチ機構で各スレッドのread()呼出タイミングを同期し、更にread()内で一定時間待つことで実行タイミングを重複させる。
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+        List<Future<DataRecord>> result = executor.invokeAll(tasks);
+
+        List<String> actualList = new ArrayList<>();
+        for (Future<DataRecord> future : result) {
+            actualList.add((String) future.get().get("byteString"));
+        }
+
+        assertThat(actualList, hasItems("ｱｲｳｴｵｶｷｸｹｺ","ｻｼｽｾｿﾀﾁﾂﾃﾄ","ﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎ","ﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘ"));
     }
 }

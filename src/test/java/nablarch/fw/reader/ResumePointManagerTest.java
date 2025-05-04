@@ -9,7 +9,6 @@ import java.sql.SQLException;
 
 import nablarch.core.ThreadContext;
 import nablarch.core.db.transaction.SimpleDbTransactionManager;
-import nablarch.core.util.FilePathSetting;
 import nablarch.fw.TestSupport;
 import nablarch.test.support.SystemRepositoryResource;
 import nablarch.test.support.db.helper.DatabaseTestRunner;

@@ -50,7 +50,7 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
      * @param ctx 実行コンテキスト
      * @return レコードデータをキャッシュするオブジェクト
      */
-    public synchronized SqlRow read(ExecutionContext ctx) {
+    public SqlRow read(ExecutionContext ctx) {
         if (records == null) {
             readRecords();
         }
@@ -66,7 +66,7 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
      * @param ctx 実行コンテキスト
      * @return 次に読み込むレコードが存在する場合 {@code true}
      */
-    public synchronized boolean hasNext(ExecutionContext ctx) {
+    public boolean hasNext(ExecutionContext ctx) {
         if (records == null) {
             readRecords();
         }
@@ -81,7 +81,7 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
      *
      *  @param ctx 実行コンテキスト
      */
-    public synchronized void close(ExecutionContext ctx) {
+    public void close(ExecutionContext ctx) {
         if (statement != null) {
             statement.close();
         }
@@ -94,7 +94,7 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
      *
      * @param ctx 実行コンテキスト
      */
-    public synchronized void reopen(ExecutionContext ctx) {
+    public void reopen(ExecutionContext ctx) {
         readRecords();
     }
 
@@ -130,7 +130,7 @@ public class DatabaseRecordReader implements DataReader<SqlRow> {
      * @return このオブジェクト自体
      */
     @Published
-    public synchronized DatabaseRecordReader setStatement(SqlPStatement statement) {
+    public DatabaseRecordReader setStatement(SqlPStatement statement) {
         this.statement = statement;
         return this;
     }
